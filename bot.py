@@ -1,3 +1,4 @@
+```python
 import os
 import json
 import time
@@ -10,7 +11,7 @@ from matplotlib.patches import Circle, Polygon, FancyBboxPatch
 
 
 # ============================================================
-# CONFIGURATION
+# CONFIG
 # ============================================================
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -22,57 +23,83 @@ if not BOT_TOKEN:
 
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
-# ETH price must move this amount from the last sent price
+# ETH price movement required for a new notification
 PRICE_TRIGGER = 30.0
 
-# Price check interval.
+# Check ETH price every 60 seconds
 # This is NOT the notification interval.
 CHECK_INTERVAL = 60
 
-# Permanent storage files
 SUBSCRIBERS_FILE = "subscribers.json"
 STATE_FILE = "bot_state.json"
 
 
 # ============================================================
-# GLOBAL DATA
+# LOAD / SAVE DATA
 # ============================================================
 
 subscribers_lock = threading.Lock()
 
 
 def load_json(filename, default):
+
     try:
+
         if not os.path.exists(filename):
             return default
 
-        with open(filename, "r", encoding="utf-8") as file:
-            return json.load(file)
+        with open(
+            filename,
+            "r",
+            encoding="utf-8"
+        ) as f:
+
+            return json.load(f)
 
     except Exception as e:
-        print(f"❌ {filename} load error: {e}")
+
+        print(
+            f"❌ {filename} load error: {e}"
+        )
+
         return default
 
 
 def save_json(filename, data):
-    try:
-        temp_filename = filename + ".tmp"
 
-        with open(temp_filename, "w", encoding="utf-8") as file:
+    try:
+
+        temp_file = filename + ".tmp"
+
+        with open(
+            temp_file,
+            "w",
+            encoding="utf-8"
+        ) as f:
+
             json.dump(
                 data,
-                file,
+                f,
                 indent=2,
                 ensure_ascii=False
             )
 
-        os.replace(temp_filename, filename)
+        os.replace(
+            temp_file,
+            filename
+        )
 
     except Exception as e:
-        print(f"❌ {filename} save error: {e}")
+
+        print(
+            f"❌ {filename} save error: {e}"
+        )
 
 
-# Load subscribers
+# ============================================================
+# SUBSCRIBERS
+# ============================================================
+
 loaded_subscribers = load_json(
     SUBSCRIBERS_FILE,
     []
@@ -81,13 +108,22 @@ loaded_subscribers = load_json(
 subscribers = set()
 
 for item in loaded_subscribers:
+
     try:
-        subscribers.add(int(item))
+
+        subscribers.add(
+            int(item)
+        )
+
     except Exception:
+
         pass
 
 
-# Load bot state
+# ============================================================
+# BOT STATE
+# ============================================================
+
 state = load_json(
     STATE_FILE,
     {
@@ -97,7 +133,7 @@ state = load_json(
 
 
 # ============================================================
-# TELEGRAM - SEND MESSAGE
+# TELEGRAM SEND MESSAGE
 # ============================================================
 
 def send_message(chat_id, text):
@@ -119,9 +155,11 @@ def send_message(chat_id, text):
         )
 
         if not response.ok:
+
             print(
                 f"❌ Telegram message error "
-                f"{response.status_code}: {response.text}"
+                f"{response.status_code}: "
+                f"{response.text}"
             )
 
             return False
@@ -138,36 +176,34 @@ def send_message(chat_id, text):
 
 
 # ============================================================
-# TELEGRAM - SEND PHOTO
+# TELEGRAM SEND PHOTO
 # ============================================================
 
-def send_photo_with_caption(
+def send_photo(
     chat_id,
-    photo_buffer,
-    caption=""
+    image_buffer,
+    caption
 ):
 
     url = f"{TELEGRAM_API}/sendPhoto"
 
     try:
 
-        photo_buffer.seek(0)
+        image_buffer.seek(0)
 
         files = {
             "photo": (
                 "eth_price.png",
-                photo_buffer,
+                image_buffer,
                 "image/png"
             )
         }
 
         data = {
             "chat_id": chat_id,
+            "caption": caption,
             "parse_mode": "HTML"
         }
-
-        if caption:
-            data["caption"] = caption
 
         response = requests.post(
             url,
@@ -180,7 +216,8 @@ def send_photo_with_caption(
 
             print(
                 f"❌ Telegram photo error "
-                f"{response.status_code}: {response.text}"
+                f"{response.status_code}: "
+                f"{response.text}"
             )
 
             return False
@@ -197,7 +234,7 @@ def send_photo_with_caption(
 
 
 # ============================================================
-# TELEGRAM - GET UPDATES
+# TELEGRAM GET UPDATES
 # ============================================================
 
 def get_updates(offset=None):
@@ -209,6 +246,7 @@ def get_updates(offset=None):
     }
 
     if offset is not None:
+
         params["offset"] = offset
 
     try:
@@ -221,12 +259,13 @@ def get_updates(offset=None):
 
         response.raise_for_status()
 
-        result = response.json()
+        data = response.json()
 
-        if not result.get("ok"):
+        if not data.get("ok"):
+
             return []
 
-        return result.get(
+        return data.get(
             "result",
             []
         )
@@ -248,17 +287,23 @@ def listen_for_users():
 
     offset = None
 
-    print("👂 Telegram listener started.")
+    print(
+        "👂 Telegram listener started."
+    )
 
     while True:
 
         try:
 
-            updates = get_updates(offset)
+            updates = get_updates(
+                offset
+            )
 
             for update in updates:
 
-                offset = update["update_id"] + 1
+                offset = (
+                    update["update_id"] + 1
+                )
 
                 message = update.get(
                     "message",
@@ -266,6 +311,7 @@ def listen_for_users():
                 )
 
                 if not message:
+
                     continue
 
                 text = message.get(
@@ -283,6 +329,7 @@ def listen_for_users():
                 )
 
                 if not chat_id:
+
                     continue
 
 
@@ -317,8 +364,9 @@ def listen_for_users():
                         send_message(
                             chat_id,
                             "✅ <b>সাবস্ক্রাইব করা হয়েছে!</b>\n\n"
-                            "ETH-এর দাম শেষবারের update price থেকে "
-                            "<b>$30</b> উপরে বা নিচে গেলে নতুন price update পাবেন। 🚀\n\n"
+                            "ETH-এর দাম শেষ update price থেকে "
+                            "<b>$30</b> উপরে বা নিচে গেলে "
+                            "নতুন price update পাবেন। 🚀\n\n"
                             "বন্ধ করতে /stop পাঠান।"
                         )
 
@@ -331,7 +379,8 @@ def listen_for_users():
                         send_message(
                             chat_id,
                             "ℹ️ আপনি ইতিমধ্যেই subscribed আছেন।\n\n"
-                            "ETH প্রতি $30 movement হলে নতুন update পাবেন। 📈"
+                            "ETH প্রতি $30 movement হলে "
+                            "নতুন update পাবেন।"
                         )
 
 
@@ -365,7 +414,8 @@ def listen_for_users():
 
                         send_message(
                             chat_id,
-                            "❌ <b>আপনাকে update list থেকে সরিয়ে দেওয়া হয়েছে।</b>\n\n"
+                            "❌ <b>আপনাকে update list থেকে "
+                            "সরিয়ে দেওয়া হয়েছে।</b>\n\n"
                             "আবার update পেতে /start পাঠান।"
                         )
 
@@ -388,7 +438,10 @@ def listen_for_users():
                 elif text.startswith("/status"):
 
                     with subscribers_lock:
-                        count = len(subscribers)
+
+                        count = len(
+                            subscribers
+                        )
 
                     last_price = state.get(
                         "last_sent_price"
@@ -400,9 +453,12 @@ def listen_for_users():
                             chat_id,
                             "📊 <b>ETH PRICE BOT STATUS</b>\n\n"
                             f"👥 Subscribers: <b>{count}</b>\n"
-                            f"💵 Last update: <b>${last_price:,.2f}</b>\n"
-                            f"🎯 Trigger: <b>${PRICE_TRIGGER:.0f}</b>\n"
-                            f"🔎 Check: <b>60 seconds</b>"
+                            f"💵 Last update: "
+                            f"<b>${last_price:,.2f}</b>\n"
+                            f"🎯 Trigger: "
+                            f"<b>${PRICE_TRIGGER:.0f}</b>\n"
+                            f"🔎 Price check: "
+                            f"<b>60 seconds</b>"
                         )
 
                     else:
@@ -412,8 +468,10 @@ def listen_for_users():
                             "📊 <b>ETH PRICE BOT STATUS</b>\n\n"
                             f"👥 Subscribers: <b>{count}</b>\n"
                             "💵 Last update: <b>Not yet</b>\n"
-                            f"🎯 Trigger: <b>${PRICE_TRIGGER:.0f}</b>\n"
-                            f"🔎 Check: <b>60 seconds</b>"
+                            f"🎯 Trigger: "
+                            f"<b>${PRICE_TRIGGER:.0f}</b>\n"
+                            f"🔎 Price check: "
+                            f"<b>60 seconds</b>"
                         )
 
 
@@ -427,7 +485,7 @@ def listen_for_users():
 
 
 # ============================================================
-# GET CURRENT ETH PRICE
+# GET ETH PRICE
 # ============================================================
 
 def get_eth_price():
@@ -458,11 +516,13 @@ def get_eth_price():
     )
 
     if not ethereum:
+
         raise ValueError(
             "Ethereum data missing."
         )
 
     if "usd" not in ethereum:
+
         raise ValueError(
             "ETH USD price missing."
         )
@@ -485,7 +545,7 @@ def get_eth_price():
 
 
 # ============================================================
-# DRAW ETHEREUM ICON
+# DRAW ETH ICON
 # ============================================================
 
 def draw_eth_icon(
@@ -493,7 +553,7 @@ def draw_eth_icon(
     x,
     y,
     size,
-    alpha=0.8
+    alpha=0.65
 ):
 
     top = (
@@ -522,7 +582,6 @@ def draw_eth_icon(
     )
 
 
-    # Left upper
     ax.add_patch(
         Polygon(
             [
@@ -538,7 +597,6 @@ def draw_eth_icon(
     )
 
 
-    # Right upper
     ax.add_patch(
         Polygon(
             [
@@ -547,14 +605,13 @@ def draw_eth_icon(
                 right
             ],
             closed=True,
-            facecolor="#d8e0ff",
+            facecolor="#d9ddff",
             edgecolor="white",
             alpha=alpha
         )
     )
 
 
-    # Left lower
     ax.add_patch(
         Polygon(
             [
@@ -563,14 +620,13 @@ def draw_eth_icon(
                 center
             ],
             closed=True,
-            facecolor="#b6c4ff",
+            facecolor="#b9c2ff",
             edgecolor="white",
             alpha=alpha
         )
     )
 
 
-    # Right lower
     ax.add_patch(
         Polygon(
             [
@@ -579,7 +635,7 @@ def draw_eth_icon(
                 right
             ],
             closed=True,
-            facecolor="#899cff",
+            facecolor="#929eff",
             edgecolor="white",
             alpha=alpha
         )
@@ -587,54 +643,64 @@ def draw_eth_icon(
 
 
 # ============================================================
-# CREATE PREMIUM ETH PRICE CARD
+# CREATE 413 x 108 PRICE CARD
 # ============================================================
 
 def create_price_card(price_data):
 
     price = price_data["usd"]
 
-    change_24h = price_data[
-        "usd_24h_change"
-    ]
+
+    # EXACT IMAGE SIZE:
+    # 413 x 108 pixels
+
+    WIDTH = 413
+    HEIGHT = 108
+    DPI = 100
 
 
-    # --------------------------------------------------------
-    # Canvas
-    # --------------------------------------------------------
-
-    fig, ax = plt.subplots(
-        figsize=(12, 7),
-        dpi=130
+    fig = plt.figure(
+        figsize=(
+            WIDTH / DPI,
+            HEIGHT / DPI
+        ),
+        dpi=DPI
     )
+
+
+    ax = fig.add_axes(
+        [
+            0,
+            0,
+            1,
+            1
+        ]
+    )
+
 
     ax.set_xlim(
         0,
-        1200
+        WIDTH
     )
 
     ax.set_ylim(
         0,
-        700
+        HEIGHT
     )
 
     ax.axis("off")
 
 
-    # --------------------------------------------------------
-    # Background
-    # --------------------------------------------------------
-
-    fig.patch.set_facecolor(
-        "#6574F5"
-    )
+    # ========================================================
+    # BLUE / PURPLE BACKGROUND
+    # ========================================================
 
     ax.set_facecolor(
-        "#6574F5"
+        "#6675F5"
     )
 
 
-    # Main background blocks
+    # Main background
 
     ax.add_patch(
         FancyBboxPatch(
@@ -642,132 +708,146 @@ def create_price_card(price_data):
                 0,
                 0
             ),
-            1200,
-            700,
-            boxstyle="round,pad=0",
-            facecolor="#6675F6",
+            WIDTH,
+            HEIGHT,
+            boxstyle="round,pad=0,rounding_size=2",
+            facecolor="#6675F5",
             edgecolor="none"
         )
     )
 
 
-    # --------------------------------------------------------
-    # Purple gradient-style decorative panels
-    # --------------------------------------------------------
+    # Purple upper area
 
     ax.add_patch(
         Polygon(
             [
-                (0, 700),
-                (1200, 700),
-                (1200, 490),
-                (850, 600),
-                (400, 500),
-                (0, 590)
+                (0, 108),
+                (413, 108),
+                (413, 82),
+                (310, 99),
+                (180, 84),
+                (65, 100),
+                (0, 90)
             ],
             closed=True,
-            facecolor="#5866E8",
-            alpha=0.65,
+            facecolor="#725FEA",
+            alpha=0.70,
             edgecolor="none"
         )
     )
 
 
+    # Light blue middle shape
+
     ax.add_patch(
         Polygon(
             [
-                (0, 0),
-                (1200, 0),
-                (1200, 170),
-                (900, 110),
-                (500, 180),
-                (0, 100)
+                (0, 67),
+                (85, 79),
+                (170, 63),
+                (255, 82),
+                (330, 68),
+                (413, 79),
+                (413, 108),
+                (0, 108)
             ],
             closed=True,
-            facecolor="#765BEA",
+            facecolor="#7082F7",
             alpha=0.45,
             edgecolor="none"
         )
     )
 
 
-    # --------------------------------------------------------
-    # Lightning decorations
-    # --------------------------------------------------------
+    # ========================================================
+    # LIGHTNING - LEFT
+    # ========================================================
 
     ax.plot(
         [
             0,
-            85,
-            48,
-            155
+            24,
+            17,
+            43,
+            29,
+            51
         ],
         [
-            620,
-            680,
-            625,
-            690
+            99,
+            106,
+            97,
+            101,
+            91,
+            94
         ],
         color="white",
-        linewidth=9,
-        alpha=0.75
-    )
-
-
-    ax.plot(
-        [
-            1040,
-            1200
-        ],
-        [
-            95,
-            260
-        ],
-        color="#d6b2ff",
-        linewidth=10,
+        linewidth=2.5,
         alpha=0.85
     )
 
 
+    # ========================================================
+    # LIGHTNING - RIGHT
+    # ========================================================
+
     ax.plot(
         [
-            1090,
-            1200
+            361,
+            381,
+            375,
+            413
         ],
         [
-            80,
-            195
+            34,
+            53,
+            47,
+            82
         ],
-        color="white",
-        linewidth=5,
-        alpha=0.4
+        color="#d7b0ff",
+        linewidth=3,
+        alpha=0.90
     )
 
 
-    # --------------------------------------------------------
-    # Decorative circles
-    # --------------------------------------------------------
+    ax.plot(
+        [
+            375,
+            394,
+            388,
+            413
+        ],
+        [
+            38,
+            57,
+            52,
+            75
+        ],
+        color="#ffffff",
+        linewidth=1.4,
+        alpha=0.65
+    )
 
-    decorative_coins = [
+
+    # ========================================================
+    # DECORATIVE COINS
+    # ========================================================
+
+    coins = [
         (
-            120,
-            565,
-            42
+            97,
+            80,
+            14
         ),
         (
-            1055,
-            570,
-            40
-        ),
-        (
-            965,
-            125,
-            30
+            313,
+            76,
+            13
         )
     ]
 
 
-    for cx, cy, radius in decorative_coins:
+    for cx, cy, radius in coins:
 
         ax.add_patch(
             Circle(
@@ -777,150 +857,100 @@ def create_price_card(price_data):
                 ),
                 radius,
                 facecolor="#ffffff",
-                edgecolor="#dce1ff",
-                linewidth=3,
-                alpha=0.20
+                edgecolor="#dfe3ff",
+                linewidth=1.5,
+                alpha=0.25
             )
         )
 
-
-    # --------------------------------------------------------
-    # ETH icons
-    # --------------------------------------------------------
-
-    draw_eth_icon(
-        ax,
-        120,
-        565,
-        25,
-        0.75
-    )
-
-    draw_eth_icon(
-        ax,
-        1055,
-        570,
-        25,
-        0.70
-    )
-
-    draw_eth_icon(
-        ax,
-        965,
-        125,
-        18,
-        0.40
-    )
+        draw_eth_icon(
+            ax,
+            cx,
+            cy,
+            7,
+            0.65
+        )
 
 
-    # --------------------------------------------------------
-    # Top right ETH PRICE BOT
-    # --------------------------------------------------------
+    # ========================================================
+    # TOP CENTER
+    # ========================================================
 
     ax.text(
-        1160,
-        660,
-        "ETH",
-        ha="right",
+        207,
+        101,
+        "ETHEREUM",
+        ha="center",
         va="center",
-        fontsize=22,
+        fontsize=6.3,
         fontweight="bold",
         color="white"
     )
 
+
+    # ========================================================
+    # TOP RIGHT LOGO
+    # ========================================================
+
     ax.text(
-        1160,
-        635,
+        405,
+        101,
+        "ETH",
+        ha="right",
+        va="center",
+        fontsize=8.5,
+        fontweight="bold",
+        color="white"
+    )
+
+
+    ax.text(
+        405,
+        94,
         "PRICE BOT",
         ha="right",
         va="center",
-        fontsize=10,
+        fontsize=3.6,
         fontweight="bold",
-        color="#e7e9ff"
+        color="#eeeeff"
     )
 
 
-    # --------------------------------------------------------
-    # Header
-    # --------------------------------------------------------
+    # ========================================================
+    # MAIN PRICE
+    # ========================================================
 
     ax.text(
-        600,
-        650,
-        "ETHEREUM",
-        ha="center",
-        va="center",
-        fontsize=15,
-        fontweight="bold",
-        color="#f0f1ff"
-    )
-
-
-    # --------------------------------------------------------
-    # Main price
-    # --------------------------------------------------------
-
-    ax.text(
-        600,
-        405,
+        207,
+        67,
         f"${price:,.0f}",
         ha="center",
         va="center",
-        fontsize=76,
+        fontsize=34,
         fontweight="bold",
         color="black"
     )
 
 
-    # --------------------------------------------------------
-    # 24H movement
-    # --------------------------------------------------------
-
-    if change_24h >= 0:
-
-        change_text = (
-            f"▲ +{change_24h:.2f}%  24H"
-        )
-
-        change_color = "#d9ffe9"
-
-    else:
-
-        change_text = (
-            f"▼ {change_24h:.2f}%  24H"
-        )
-
-        change_color = "#ffe1e5"
-
-
-    ax.text(
-        600,
-        315,
-        change_text,
-        ha="center",
-        va="center",
-        fontsize=21,
-        fontweight="bold",
-        color=change_color
-    )
-
-
-    # --------------------------------------------------------
-    # Telegram username pill
-    # --------------------------------------------------------
+    # ========================================================
+    # TELEGRAM PILL
+    # ========================================================
 
     pill = FancyBboxPatch(
         (
-            455,
-            220
+            161,
+            30
         ),
-        290,
-        65,
-        boxstyle="round,pad=0.02,rounding_size=28",
-        facecolor="#8A69E8",
-        edgecolor="#b9a6ff",
-        linewidth=2,
-        alpha=0.95
+        94,
+        18,
+        boxstyle=(
+            "round,pad=0.02,"
+            "rounding_size=8"
+        ),
+        facecolor="#8D72E7",
+        edgecolor="#BBA9FF",
+        linewidth=0.8,
+        alpha=0.98
     )
 
     ax.add_patch(
@@ -929,72 +959,66 @@ def create_price_card(price_data):
 
 
     ax.text(
-        600,
-        252,
+        208,
+        39,
         "✈  @eth_price",
         ha="center",
         va="center",
-        fontsize=22,
+        fontsize=8.5,
+        fontweight="bold",
+        color="#151515"
+    )
+
+
+    # ========================================================
+    # POWERED BY
+    # ========================================================
+
+    ax.text(
+        7,
+        8,
+        "POWERED BY",
+        ha="left",
+        va="center",
+        fontsize=3.5,
         fontweight="bold",
         color="white"
     )
 
 
-    # --------------------------------------------------------
-    # Bottom branding
-    # --------------------------------------------------------
-
     ax.text(
-        35,
-        38,
-        "POWERED BY WATCH-ETH",
+        7,
+        4,
+        "WATCH-ETH",
         ha="left",
         va="center",
-        fontsize=10,
+        fontsize=3.5,
         fontweight="bold",
-        color="#f0f1ff",
-        alpha=0.9
+        color="white"
     )
 
 
-    ax.text(
-        1165,
-        38,
-        "ETH / USD",
-        ha="right",
-        va="center",
-        fontsize=11,
-        fontweight="bold",
-        color="white",
-        alpha=0.9
-    )
-
-
-    # --------------------------------------------------------
-    # Save to memory
-    # --------------------------------------------------------
-
-    plt.subplots_adjust(
-        left=0,
-        right=1,
-        top=1,
-        bottom=0
-    )
+    # ========================================================
+    # SAVE EXACT SIZE
+    # ========================================================
 
     image_buffer = io.BytesIO()
 
-    plt.savefig(
+
+    fig.savefig(
         image_buffer,
         format="png",
-        dpi=130,
-        bbox_inches="tight",
-        pad_inches=0,
-        facecolor=fig.get_facecolor()
+        dpi=DPI,
+        facecolor="#6675F5",
+        edgecolor="none",
+        pad_inches=0
     )
+
 
     image_buffer.seek(0)
 
     plt.close(fig)
+
 
     return image_buffer
 
@@ -1005,21 +1029,41 @@ def create_price_card(price_data):
 
 def format_caption(price_data):
 
-    # Main information is already inside the image.
-    # Keep Telegram caption empty.
+    price = price_data["usd"]
 
-    return ""
+    change = price_data["usd_24h_change"]
+
+
+    if change >= 0:
+
+        arrow = "🔺"
+
+    else:
+
+        arrow = "🔻"
+
+
+    # This creates the text below the image.
+    # The username becomes clickable.
+
+    return (
+        f'{arrow} ${price:,.0f} '
+        f'<a href="https://t.me/tmmad1">'
+        f'@eth_price'
+        f'</a>'
+    )
 
 
 # ============================================================
-# SEND UPDATE TO ALL SUBSCRIBERS
+# BROADCAST
 # ============================================================
 
 def broadcast_update(price_data):
 
     print(
-        "🎨 Premium ETH price card তৈরি হচ্ছে..."
+        "🎨 Creating ETH price image..."
     )
+
 
     try:
 
@@ -1051,14 +1095,15 @@ def broadcast_update(price_data):
     if not current_subscribers:
 
         print(
-            "⏳ কোনো subscriber নেই।"
+            "⏳ No subscribers."
         )
 
         return
 
 
     print(
-        f"📡 {len(current_subscribers)} জনকে image পাঠানো হচ্ছে..."
+        f"📡 Sending to "
+        f"{len(current_subscribers)} subscribers..."
     )
 
 
@@ -1067,7 +1112,7 @@ def broadcast_update(price_data):
 
     for chat_id in current_subscribers:
 
-        success = send_photo_with_caption(
+        success = send_photo(
             chat_id,
             image,
             caption
@@ -1077,13 +1122,13 @@ def broadcast_update(price_data):
         if success:
 
             print(
-                f"✅ Sent: {chat_id}"
+                f"✅ Sent to {chat_id}"
             )
 
         else:
 
             print(
-                f"❌ Failed: {chat_id}"
+                f"❌ Failed to send to {chat_id}"
             )
 
             failed_users.append(
@@ -1091,10 +1136,13 @@ def broadcast_update(price_data):
             )
 
 
-        time.sleep(0.25)
+        time.sleep(
+            0.25
+        )
 
 
     # Remove failed users
+
     if failed_users:
 
         with subscribers_lock:
@@ -1113,12 +1161,13 @@ def broadcast_update(price_data):
 
 
         print(
-            f"🗑️ {len(failed_users)} invalid subscriber removed."
+            f"🗑️ Removed "
+            f"{len(failed_users)} failed subscribers."
         )
 
 
     print(
-        "✅ সবাইকে ETH price card পাঠানো হয়েছে!"
+        "✅ ETH update completed."
     )
 
 
@@ -1133,11 +1182,12 @@ def price_monitor():
     )
 
     print(
-        f"🎯 Price trigger: ${PRICE_TRIGGER:.2f}"
+        f"🎯 Trigger: ${PRICE_TRIGGER:.0f}"
     )
 
     print(
-        f"🔎 Price check: every {CHECK_INTERVAL} seconds"
+        f"🔎 Checking every "
+        f"{CHECK_INTERVAL} seconds."
     )
 
 
@@ -1156,11 +1206,17 @@ def price_monitor():
             )
 
 
+            # ==================================================
+            # FIRST UPDATE
+            # ==================================================
+
             if last_sent_price is None:
 
                 print(
-                    f"💵 ETH: ${current_price:,.2f}"
+                    f"💵 Current ETH: "
+                    f"${current_price:,.2f}"
                 )
+
 
                 with subscribers_lock:
 
@@ -1172,8 +1228,9 @@ def price_monitor():
                 if has_subscribers:
 
                     print(
-                        "🚀 প্রথম ETH update পাঠানো হচ্ছে..."
+                        "🚀 Sending first update..."
                     )
+
 
                     broadcast_update(
                         price_data
@@ -1194,9 +1251,13 @@ def price_monitor():
                 else:
 
                     print(
-                        "⏳ Subscriber নেই।"
+                        "⏳ No subscribers yet."
                     )
 
+
+            # ==================================================
+            # NORMAL $30 MOVEMENT CHECK
+            # ==================================================
 
             else:
 
@@ -1207,31 +1268,28 @@ def price_monitor():
 
 
                 print(
-                    f"💵 ETH: ${current_price:,.2f} | "
-                    f"Last update: ${last_sent_price:,.2f} | "
-                    f"Movement: ${movement:,.2f}"
+                    f"💵 ETH: "
+                    f"${current_price:,.2f} | "
+                    f"Last: "
+                    f"${last_sent_price:,.2f} | "
+                    f"Movement: "
+                    f"${movement:,.2f}"
                 )
 
-
-                # ==================================================
-                # $30 MOVEMENT REACHED
-                # ==================================================
 
                 if movement >= PRICE_TRIGGER:
 
                     if current_price > last_sent_price:
 
-                        direction = "📈 UP"
+                        print(
+                            "📈 ETH moved UP."
+                        )
 
                     else:
 
-                        direction = "📉 DOWN"
-
-
-                    print(
-                        f"🚨 ${movement:,.2f} movement detected! "
-                        f"{direction}"
-                    )
+                        print(
+                            "📉 ETH moved DOWN."
+                        )
 
 
                     with subscribers_lock:
@@ -1243,12 +1301,18 @@ def price_monitor():
 
                     if has_subscribers:
 
+                        print(
+                            "🚨 $30 trigger reached!"
+                        )
+
+
                         broadcast_update(
                             price_data
                         )
 
 
                         # New reference price
+
                         state[
                             "last_sent_price"
                         ] = current_price
@@ -1261,7 +1325,7 @@ def price_monitor():
 
 
                         print(
-                            f"✅ New reference price: "
+                            f"✅ New reference: "
                             f"${current_price:,.2f}"
                         )
 
@@ -1288,15 +1352,15 @@ def price_monitor():
 
 
                     print(
-                        f"⏳ Next update-এর জন্য "
-                        f"${remaining:,.2f} movement বাকি."
+                        f"⏳ ${remaining:,.2f} "
+                        f"movement remaining."
                     )
 
 
         except requests.exceptions.RequestException as e:
 
             print(
-                f"🌐 CoinGecko/API error: {e}"
+                f"🌐 API error: {e}"
             )
 
 
@@ -1319,69 +1383,66 @@ def price_monitor():
 def main():
 
     print(
-        "=================================================="
+        "=============================================="
     )
 
     print(
-        "🚀 ETH $30 MOVEMENT TELEGRAM PRICE BOT"
+        "🚀 ETH PRICE MOVEMENT TELEGRAM BOT"
     )
 
     print(
-        "=================================================="
+        "=============================================="
     )
 
     print(
-        f"👥 Subscribers: {len(subscribers)}"
+        f"👥 Subscribers: "
+        f"{len(subscribers)}"
     )
 
     print(
-        f"🎯 Price trigger: ${PRICE_TRIGGER:.2f}"
+        f"🎯 Price trigger: "
+        f"${PRICE_TRIGGER:.2f}"
     )
 
     print(
-        f"🔎 Check interval: {CHECK_INTERVAL} seconds"
+        f"🔎 Check interval: "
+        f"{CHECK_INTERVAL} seconds"
     )
 
     print(
-        "🖼️ Premium price card: ENABLED"
+        "🖼️ Image size: 413 x 108 px"
     )
 
     print(
-        "📊 7-day chart: DISABLED"
+        "📊 7-day chart: OFF"
     )
 
     print(
-        "=================================================="
+        "=============================================="
     )
 
 
-    # --------------------------------------------------------
-    # Telegram listener thread
-    # --------------------------------------------------------
+    # Telegram listener
 
-    listener = threading.Thread(
+    listener_thread = threading.Thread(
         target=listen_for_users,
         daemon=True
     )
 
-    listener.start()
+    listener_thread.start()
 
 
-    # --------------------------------------------------------
-    # ETH price monitor thread
-    # --------------------------------------------------------
+    # ETH price monitor
 
-    monitor = threading.Thread(
+    monitor_thread = threading.Thread(
         target=price_monitor,
         daemon=True
     )
 
-    monitor.start()
+    monitor_thread.start()
 
 
-    # --------------------------------------------------------
     # Keep Railway worker alive
-    # --------------------------------------------------------
 
     while True:
 
@@ -1389,8 +1450,10 @@ def main():
 
 
 # ============================================================
-# PYTHON ENTRY POINT
+# START
 # ============================================================
 
 if __name__ == "__main__":
+
     main()
+```
