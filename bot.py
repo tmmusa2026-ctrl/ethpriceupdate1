@@ -10,7 +10,7 @@ import io
 import threading
 
 # ✅ শুধু BOT_TOKEN বসান, CHAT_ID আর লাগবে না
-BOT_TOKEN = "8531688617:AAGp1iQHCWPPunWCljBeUb5EhodyfDDPIzY"
+BOT_TOKEN = "8744254991:AAE4Xayr01TjdBy16ESBwON6wFke0MMYt48"
 
 # ⏱️ 9 মিনিট পর পর আপডেট
 INTERVAL = 9 * 60
@@ -151,7 +151,7 @@ def format_caption(price_data):
         f"━━━━━━━━━━━━━━━━\n"
         f"🕐 {time_now}\n"
         f"━━━━━━━━━━━━━━━━\n"
-        f"🛠 Made By @tmmad1"
+        f"🛠 Made By @tmmusa73"
     )
 
 
