@@ -15,7 +15,7 @@ import matplotlib.dates as mdates
 # =========================================================
 
 # Linux / VPS:
-# export TELEGRAM_BOT_TOKEN="YOUR_NEW_BOT_TOKEN"
+# export TELEGRAM_BOT_TOKEN="8744254991:AAE4Xayr01TjdBy16ESBwON6wFke0MMYt48"
 
 # Windows:
 # set TELEGRAM_BOT_TOKEN=YOUR_NEW_BOT_TOKEN
