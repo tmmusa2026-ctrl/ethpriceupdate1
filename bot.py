@@ -20,7 +20,7 @@ import matplotlib.dates as mdates
 # Windows:
 # set TELEGRAM_BOT_TOKEN=YOUR_NEW_BOT_TOKEN
 
-BOT_TOKEN = os.getenv("8744254991:AAE4Xayr01TjdBy16ESBwON6wFke0MMYt48")
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 if not BOT_TOKEN:
     raise RuntimeError(
