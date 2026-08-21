@@ -23,7 +23,7 @@ if not BOT_TOKEN:
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 # ETH price movement required for a new notification
-PRICE_TRIGGER = 30.0
+PRICE_TRIGGER = 10.0
 
 # Check ETH price every 60 seconds
 # This is NOT the notification interval.
@@ -364,7 +364,7 @@ def listen_for_users():
                             chat_id,
                             "✅ <b>সাবস্ক্রাইব করা হয়েছে!</b>\n\n"
                             "ETH-এর দাম শেষ update price থেকে "
-                            "<b>$30</b> উপরে বা নিচে গেলে "
+                            "<b>$10</b> উপরে বা নিচে গেলে "
                             "নতুন price update পাবেন। 🚀\n\n"
                             "বন্ধ করতে /stop পাঠান।"
                         )
@@ -378,7 +378,7 @@ def listen_for_users():
                         send_message(
                             chat_id,
                             "ℹ️ আপনি ইতিমধ্যেই subscribed আছেন।\n\n"
-                            "ETH প্রতি $30 movement হলে "
+                            "ETH প্রতি $10 movement হলে "
                             "নতুন update পাবেন।"
                         )
 
