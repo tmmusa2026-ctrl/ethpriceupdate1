@@ -1035,11 +1035,11 @@ def format_caption(price_data):
 
     if change >= 0:
 
-        arrow = "🔺"
+        arrow = "📈"
 
     else:
 
-        arrow = "🔻"
+        arrow = "📉"
 
 
     # This creates the text below the image.
