@@ -1047,7 +1047,7 @@ def format_caption(price_data):
 
     return (
         f'{arrow} ${price:,.0f} '
-        f'<a href="https://t.me/tmmad1">'
+        f'<a href="https://t.me/tmmusa73">'
         f'@eth_price'
         f'</a>'
     )
