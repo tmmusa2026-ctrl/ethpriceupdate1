@@ -11,7 +11,7 @@ from PIL import Image, ImageDraw, ImageFont
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID")
 
-PRICE_TRIGGER = 30.0
+PRICE_TRIGGER = 1.0
 CHECK_INTERVAL = 60
 
 STATE_FILE = "bot_state.json"
