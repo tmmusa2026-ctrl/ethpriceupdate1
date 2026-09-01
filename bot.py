@@ -12,24 +12,19 @@ from PIL import Image, ImageDraw, ImageFont
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID")
 
-# Binance Spot symbol
 BINANCE_SYMBOL = "ETHUSDT"
 
-# Alert after $30 movement
 PRICE_TRIGGER = 30.0
 
-# Check price every 60 seconds
 CHECK_INTERVAL = 60
 
-# Save last alert price
 STATE_FILE = "bot_state.json"
 
-# Binance Spot API
 BINANCE_URL = "https://api.binance.com/api/v3/ticker/price"
 
 
 # =========================================================
-# ENVIRONMENT CHECK
+# CHECK VARIABLES
 # =========================================================
 
 if not BOT_TOKEN:
@@ -46,20 +41,26 @@ if not CHANNEL_ID:
 def get_font(size, bold=False):
 
     if bold:
+
         paths = [
             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
             "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf"
         ]
+
     else:
+
         paths = [
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
             "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf"
         ]
 
     for path in paths:
+
         if os.path.exists(path):
+
             try:
                 return ImageFont.truetype(path, size)
+
             except:
                 pass
 
@@ -67,7 +68,7 @@ def get_font(size, bold=False):
 
 
 # =========================================================
-# TELEGRAM API
+# TELEGRAM REQUEST
 # =========================================================
 
 def telegram_request(method, data=None, files=None):
@@ -86,6 +87,7 @@ def telegram_request(method, data=None, files=None):
         result = response.json()
 
         if not result.get("ok"):
+
             print("Telegram Error:", result)
 
         return result
@@ -122,20 +124,18 @@ def test_telegram():
 
 
 # =========================================================
-# GET ETH PRICE FROM BINANCE
+# BINANCE ETH PRICE
 # =========================================================
 
 def get_eth_price():
-
-    params = {
-        "symbol": BINANCE_SYMBOL
-    }
 
     try:
 
         response = requests.get(
             BINANCE_URL,
-            params=params,
+            params={
+                "symbol": BINANCE_SYMBOL
+            },
             timeout=20
         )
 
@@ -143,9 +143,7 @@ def get_eth_price():
 
         data = response.json()
 
-        price = float(data["price"])
-
-        return price
+        return float(data["price"])
 
     except Exception as e:
 
@@ -164,6 +162,7 @@ def get_eth_price():
 def load_state():
 
     if not os.path.exists(STATE_FILE):
+
         return None
 
     try:
@@ -198,10 +197,6 @@ def save_state(price):
 
     try:
 
-        data = {
-            "last_alert_price": price
-        }
-
         with open(
             STATE_FILE,
             "w",
@@ -209,7 +204,9 @@ def save_state(price):
         ) as file:
 
             json.dump(
-                data,
+                {
+                    "last_alert_price": price
+                },
                 file
             )
 
@@ -222,198 +219,222 @@ def save_state(price):
 
 
 # =========================================================
-# ETHEREUM LOGO
+# DRAW ETH COIN
 # =========================================================
 
-def draw_ethereum_logo(
-    draw,
-    center_x,
-    center_y,
-    size
-):
-
-    radius = size // 2
+def draw_eth_coin(draw, cx, cy, radius):
 
     # Outer circle
     draw.ellipse(
         (
-            center_x - radius,
-            center_y - radius,
-            center_x + radius,
-            center_y + radius
+            cx - radius,
+            cy - radius,
+            cx + radius,
+            cy + radius
         ),
-        outline=(55, 55, 65),
-        width=5
+        fill=(113, 136, 228),
+        outline=(170, 185, 250),
+        width=1
     )
 
-    top = (
-        center_x,
-        center_y - radius + 18
-    )
+    # Small ETH diamond
+    top = (cx, cy - radius + 4)
 
-    left = (
-        center_x - 30,
-        center_y - 5
-    )
+    left = (cx - 5, cy)
 
-    right = (
-        center_x + 30,
-        center_y - 5
-    )
+    right = (cx + 5, cy)
 
-    middle = (
-        center_x,
-        center_y + 12
-    )
+    middle = (cx, cy + 3)
 
-    bottom = (
-        center_x,
-        center_y + radius - 18
-    )
+    bottom = (cx, cy + radius - 4)
 
-    # Upper left
     draw.polygon(
         [
             top,
             left,
             middle
         ],
-        fill=(105, 115, 165)
+        fill=(225, 230, 255)
     )
 
-    # Upper right
     draw.polygon(
         [
             top,
             right,
             middle
         ],
-        fill=(75, 85, 135)
+        fill=(190, 200, 245)
     )
 
-    # Lower left
     draw.polygon(
         [
             left,
             middle,
             bottom
         ],
-        fill=(70, 80, 125)
+        fill=(180, 190, 235)
     )
 
-    # Lower right
     draw.polygon(
         [
             middle,
             right,
             bottom
         ],
-        fill=(90, 100, 150)
+        fill=(205, 212, 250)
     )
 
 
 # =========================================================
-# CANDLESTICK
-# =========================================================
-
-def draw_candlestick(
-    draw,
-    x,
-    y,
-    body_width,
-    body_height,
-    wick_height,
-    color
-):
-
-    center_x = x + body_width // 2
-
-    # Wick
-    draw.line(
-        [
-            (
-                center_x,
-                y - wick_height
-            ),
-            (
-                center_x,
-                y + body_height + wick_height
-            )
-        ],
-        fill=color,
-        width=5
-    )
-
-    # Body
-    draw.rounded_rectangle(
-        (
-            x,
-            y,
-            x + body_width,
-            y + body_height
-        ),
-        radius=5,
-        fill=color
-    )
-
-
-# =========================================================
-# CREATE PRICE IMAGE
+# CREATE IMAGE
 # =========================================================
 
 def create_price_image(price):
 
-    width = 720
-    height = 240
+    # EXACT REFERENCE SIZE
+    width = 413
+    height = 108
 
-    # Yellow background
+    # =====================================================
+    # BACKGROUND
+    # =====================================================
+
     image = Image.new(
         "RGB",
         (width, height),
-        (255, 215, 0)
+        (105, 119, 238)
     )
 
     draw = ImageDraw.Draw(image)
 
-    # Black rounded card
-    margin = 18
+    # =====================================================
+    # SOFT BACKGROUND SHAPES
+    # =====================================================
 
-    draw.rounded_rectangle(
-        (
-            margin,
-            margin,
-            width - margin,
-            height - margin
-        ),
-        radius=18,
-        fill=(5, 6, 8)
+    # Top-left diagonal decoration
+    draw.line(
+        [
+            (0, 10),
+            (14, 3),
+            (28, 10),
+            (40, 3)
+        ],
+        fill=(180, 190, 255),
+        width=2
+    )
+
+    draw.line(
+        [
+            (0, 14),
+            (14, 7),
+            (25, 13)
+        ],
+        fill=(155, 170, 250),
+        width=1
+    )
+
+    # Top-right diagonal decoration
+    draw.line(
+        [
+            (390, 0),
+            (413, 18)
+        ],
+        fill=(185, 195, 255),
+        width=2
+    )
+
+    # Bottom-right diagonal lines
+    draw.line(
+        [
+            (381, 108),
+            (413, 76)
+        ],
+        fill=(230, 190, 255),
+        width=2
+    )
+
+    draw.line(
+        [
+            (389, 108),
+            (413, 82)
+        ],
+        fill=(255, 205, 245),
+        width=2
     )
 
     # =====================================================
-    # ETH LOGO
+    # ETH COINS
     # =====================================================
 
-    draw_ethereum_logo(
+    draw_eth_coin(
         draw,
-        center_x=95,
-        center_y=120,
-        size=130
+        96,
+        29,
+        14
+    )
+
+    draw_eth_coin(
+        draw,
+        314,
+        29,
+        14
     )
 
     # =====================================================
-    # TITLE
+    # TOP TITLE
     # =====================================================
 
     title_font = get_font(
-        42,
+        9,
+        bold=True
+    )
+
+    title = "ETHEREUM"
+
+    bbox = draw.textbbox(
+        (0, 0),
+        title,
+        font=title_font
+    )
+
+    title_width = bbox[2] - bbox[0]
+
+    draw.text(
+        (
+            (width - title_width) / 2,
+            2
+        ),
+        title,
+        font=title_font,
+        fill=(255, 255, 255)
+    )
+
+    # =====================================================
+    # RIGHT TITLE
+    # =====================================================
+
+    eth_font = get_font(
+        11,
+        bold=True
+    )
+
+    bot_font = get_font(
+        5,
         bold=True
     )
 
     draw.text(
-        (180, 28),
-        "Ethereum (ETH)",
-        font=title_font,
-        fill=(240, 242, 248)
+        (377, 2),
+        "ETH",
+        font=eth_font,
+        fill=(255, 255, 255)
+    )
+
+    draw.text(
+        (377, 15),
+        "PRICE BOT",
+        font=bot_font,
+        fill=(235, 235, 255)
     )
 
     # =====================================================
@@ -421,81 +442,117 @@ def create_price_image(price):
     # =====================================================
 
     price_font = get_font(
-        57,
+        43,
         bold=True
     )
 
-    price_text = f"${price:,.2f}"
+    # No comma — exactly like reference
+    price_text = f"${price:,.0f}"
+
+    bbox = draw.textbbox(
+        (0, 0),
+        price_text,
+        font=price_font
+    )
+
+    price_width = bbox[2] - bbox[0]
+
+    price_x = (width - price_width) / 2
 
     draw.text(
-        (205, 82),
+        (
+            price_x,
+            14
+        ),
         price_text,
         font=price_font,
-        fill=(255, 45, 55)
+        fill=(0, 0, 0)
     )
 
     # =====================================================
-    # USERNAME
+    # USERNAME PILL
     # =====================================================
 
+    username = "@eth_pricealert"
+
     username_font = get_font(
-        31,
+        10,
+        bold=True
+    )
+
+    bbox = draw.textbbox(
+        (0, 0),
+        username,
+        font=username_font
+    )
+
+    username_width = bbox[2] - bbox[0]
+    username_height = bbox[3] - bbox[1]
+
+    pill_width = username_width + 18
+    pill_height = 16
+
+    pill_x = (width - pill_width) / 2
+    pill_y = 61
+
+    # Pill
+    draw.rounded_rectangle(
+        (
+            pill_x,
+            pill_y,
+            pill_x + pill_width,
+            pill_y + pill_height
+        ),
+        radius=8,
+        fill=(202, 204, 224)
+    )
+
+    # Small Telegram-style icon
+    icon_x = pill_x + 6
+    icon_y = pill_y + 8
+
+    draw.ellipse(
+        (
+            icon_x - 3,
+            icon_y - 3,
+            icon_x + 3,
+            icon_y + 3
+        ),
+        fill=(55, 55, 70)
+    )
+
+    # Username
+    draw.text(
+        (
+            pill_x + 13,
+            pill_y + 2
+        ),
+        username,
+        font=username_font,
+        fill=(25, 25, 35)
+    )
+
+    # =====================================================
+    # SMALL WATERMARK
+    # =====================================================
+
+    watermark_font = get_font(
+        4,
         bold=True
     )
 
     draw.text(
-        (240, 170),
-        "@eth_pricealert",
-        font=username_font,
-        fill=(190, 195, 210)
+        (7, 96),
+        "POWERED BY",
+        font=watermark_font,
+        fill=(240, 240, 255)
     )
 
-    # =====================================================
-    # CANDLESTICKS
-    # =====================================================
-
-    # Red candle 1
-    draw_candlestick(
-        draw,
-        x=525,
-        y=60,
-        body_width=25,
-        body_height=45,
-        wick_height=15,
-        color=(255, 45, 55)
-    )
-
-    # Red candle 2
-    draw_candlestick(
-        draw,
-        x=580,
-        y=78,
-        body_width=25,
-        body_height=50,
-        wick_height=17,
-        color=(255, 45, 55)
-    )
-
-    # Red candle 3
-    draw_candlestick(
-        draw,
-        x=635,
-        y=95,
-        body_width=25,
-        body_height=55,
-        wick_height=20,
-        color=(255, 45, 55)
-    )
-
-    # Green candle
-    draw_candlestick(
-        draw,
-        x=680,
-        y=125,
-        body_width=25,
-        body_height=25,
-        wick_height=12,
-        color=(0, 205, 80)
+    draw.text(
+        (7, 101),
+        "BINANCE",
+        font=watermark_font,
+        fill=(240, 240, 255)
     )
 
     # =====================================================
@@ -567,29 +624,22 @@ def send_alert(
             "rb"
         ) as photo:
 
-            files = {
-                "photo": photo
-            }
-
-            data = {
-
-                "chat_id": CHANNEL_ID,
-
-                "caption": caption,
-
-                "parse_mode": "HTML"
-            }
-
             result = telegram_request(
                 "sendPhoto",
-                data=data,
-                files=files
+                data={
+                    "chat_id": CHANNEL_ID,
+                    "caption": caption,
+                    "parse_mode": "HTML"
+                },
+                files={
+                    "photo": photo
+                }
             )
 
         if result and result.get("ok"):
 
             print(
-                f"Alert sent successfully: "
+                "Alert sent successfully:",
                 f"${price:,.2f}"
             )
 
@@ -621,25 +671,14 @@ def price_monitor():
 
     print("")
     print("==============================")
-    print("     ETH PRICE CHANNEL BOT")
+    print("      ETH PRICE CHANNEL BOT")
     print("==============================")
+    print("Price Source: Binance")
+    print("Symbol:", BINANCE_SYMBOL)
+    print("Channel:", CHANNEL_ID)
+    print("Trigger: $", PRICE_TRIGGER)
     print(
-        "Price source: Binance"
-    )
-    print(
-        "Symbol:",
-        BINANCE_SYMBOL
-    )
-    print(
-        "Channel:",
-        CHANNEL_ID
-    )
-    print(
-        "Trigger: $",
-        PRICE_TRIGGER
-    )
-    print(
-        "Check interval:",
+        "Check Interval:",
         CHECK_INTERVAL,
         "seconds"
     )
@@ -655,7 +694,7 @@ def price_monitor():
             if current_price is None:
 
                 print(
-                    "Could not get ETH price."
+                    "Could not get Binance ETH price."
                 )
 
                 time.sleep(
@@ -670,7 +709,7 @@ def price_monitor():
             )
 
             # =================================================
-            # FIRST RUN
+            # FIRST ALERT
             # =================================================
 
             if last_alert_price is None:
@@ -696,7 +735,7 @@ def price_monitor():
                     )
 
             # =================================================
-            # NORMAL MOVEMENT
+            # $30 MOVEMENT
             # =================================================
 
             else:
@@ -714,7 +753,7 @@ def price_monitor():
                 if movement >= PRICE_TRIGGER:
 
                     print(
-                        "Price moved $30+."
+                        "ETH moved $30+."
                     )
 
                     print(
