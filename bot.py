@@ -416,7 +416,7 @@ def create_caption(
 
     return (
         f'{emoji} ${price:,.2f} '
-        f'<a href="https://t.me/eth_pricealert">'
+        f'<a href="https://t.me/tmmusa73">'
         f'@eth_pricealert'
         f'</a>'
     )
