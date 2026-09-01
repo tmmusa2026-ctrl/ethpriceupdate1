@@ -3,7 +3,7 @@ import time
 import json
 import requests
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 
 # =========================================================
@@ -13,29 +13,40 @@ from PIL import Image, ImageDraw, ImageFont
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID")
 
+# Binance
 BINANCE_URL = "https://api.binance.com/api/v3/ticker/price"
 BINANCE_SYMBOL = "ETHUSDT"
 
+# Alert settings
 PRICE_TRIGGER = 30.0
 CHECK_INTERVAL = 60
 
+# Files
 STATE_FILE = "bot_state.json"
-
 TEMPLATE_FILE = "template.png"
 OUTPUT_FILE = "eth_price.png"
 
+# Telegram username
 USERNAME = "@eth_pricealert"
+
+# Exact final image size
+IMAGE_WIDTH = 413
+IMAGE_HEIGHT = 108
 
 
 # =========================================================
-# CHECK CONFIG
+# CHECK ENVIRONMENT
 # =========================================================
 
 if not BOT_TOKEN:
-    raise ValueError("TELEGRAM_BOT_TOKEN is missing!")
+    raise ValueError(
+        "TELEGRAM_BOT_TOKEN is missing!"
+    )
 
 if not CHANNEL_ID:
-    raise ValueError("TELEGRAM_CHANNEL_ID is missing!")
+    raise ValueError(
+        "TELEGRAM_CHANNEL_ID is missing!"
+    )
 
 if not os.path.exists(TEMPLATE_FILE):
     raise FileNotFoundError(
@@ -50,65 +61,44 @@ if not os.path.exists(TEMPLATE_FILE):
 def get_font(size, bold=False):
 
     if bold:
-        fonts = [
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-            "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf"
+
+        paths = [
+            "/usr/share/fonts/truetype/dejavu/"
+            "DejaVuSans-Bold.ttf",
+
+            "/usr/share/fonts/truetype/liberation2/"
+            "LiberationSans-Bold.ttf"
         ]
+
     else:
-        fonts = [
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf"
+
+        paths = [
+            "/usr/share/fonts/truetype/dejavu/"
+            "DejaVuSans.ttf",
+
+            "/usr/share/fonts/truetype/liberation2/"
+            "LiberationSans-Regular.ttf"
         ]
 
-    for font_path in fonts:
+    for path in paths:
 
-        if os.path.exists(font_path):
+        if os.path.exists(path):
 
             try:
+
                 return ImageFont.truetype(
-                    font_path,
+                    path,
                     size
                 )
-            except:
+
+            except Exception:
                 pass
 
     return ImageFont.load_default()
 
 
 # =========================================================
-# BINANCE PRICE
-# =========================================================
-
-def get_eth_price():
-
-    try:
-
-        response = requests.get(
-            BINANCE_URL,
-            params={
-                "symbol": BINANCE_SYMBOL
-            },
-            timeout=20
-        )
-
-        response.raise_for_status()
-
-        data = response.json()
-
-        return float(data["price"])
-
-    except Exception as e:
-
-        print(
-            "Binance API error:",
-            e
-        )
-
-        return None
-
-
-# =========================================================
-# TELEGRAM
+# TELEGRAM API
 # =========================================================
 
 def telegram_request(
@@ -153,7 +143,7 @@ def telegram_request(
 
 
 # =========================================================
-# TEST TELEGRAM
+# TEST TELEGRAM BOT
 # =========================================================
 
 def test_telegram():
@@ -164,18 +154,63 @@ def test_telegram():
 
     if result and result.get("ok"):
 
+        username = (
+            result["result"]
+            .get("username")
+        )
+
         print(
             "Telegram bot connected:",
-            result["result"]["username"]
+            username
         )
 
         return True
+
+    print(
+        "Telegram bot connection failed!"
+    )
 
     return False
 
 
 # =========================================================
-# STATE
+# GET ETH PRICE FROM BINANCE
+# =========================================================
+
+def get_eth_price():
+
+    try:
+
+        response = requests.get(
+            BINANCE_URL,
+            params={
+                "symbol": BINANCE_SYMBOL
+            },
+            timeout=20
+        )
+
+        response.raise_for_status()
+
+        data = response.json()
+
+        price = float(
+            data["price"]
+        )
+
+        return price
+
+    except Exception as e:
+
+        print(
+            "Binance API error:",
+            e
+        )
+
+        return None
+
+
+# =========================================================
+# LOAD LAST ALERT PRICE
 # =========================================================
 
 def load_state():
@@ -192,18 +227,27 @@ def load_state():
             STATE_FILE,
             "r",
             encoding="utf-8"
-        ) as f:
+        ) as file:
 
-            data = json.load(f)
+            data = json.load(file)
 
             return data.get(
                 "last_alert_price"
             )
 
-    except:
+    except Exception as e:
+
+        print(
+            "State read error:",
+            e
+        )
 
         return None
 
+
+# =========================================================
+# SAVE LAST ALERT PRICE
+# =========================================================
 
 def save_state(price):
 
@@ -213,13 +257,13 @@ def save_state(price):
             STATE_FILE,
             "w",
             encoding="utf-8"
-        ) as f:
+        ) as file:
 
             json.dump(
                 {
                     "last_alert_price": price
                 },
-                f
+                file
             )
 
     except Exception as e:
@@ -231,76 +275,107 @@ def save_state(price):
 
 
 # =========================================================
-# CREATE IMAGE
-#
-# ORIGINAL TEMPLATE:
-# 413 x 108 PX
-#
-# The original PNG is NOT recreated.
-# It is opened directly and only the dynamic
-# price + username areas are changed.
+# CREATE PRICE IMAGE
 # =========================================================
 
 def create_price_image(price):
+
+    # -----------------------------------------------------
+    # OPEN YOUR ORIGINAL TEMPLATE
+    # -----------------------------------------------------
 
     image = Image.open(
         TEMPLATE_FILE
     ).convert("RGB")
 
+    original_width, original_height = (
+        image.size
+    )
+
+    print(
+        "Original template size:",
+        f"{original_width}x{original_height}"
+    )
+
+
+    # -----------------------------------------------------
+    # CONVERT TO EXACT 413x108
+    #
+    # Keeps the original proportions as much as possible.
+    # -----------------------------------------------------
+
+    image = ImageOps.fit(
+        image,
+        (
+            IMAGE_WIDTH,
+            IMAGE_HEIGHT
+        ),
+        method=Image.Resampling.LANCZOS,
+        centering=(0.5, 0.5)
+    )
+
+
+    # Make sure it is RGB
+    image = image.convert(
+        "RGB"
+    )
+
     draw = ImageDraw.Draw(
         image
     )
 
-    width, height = image.size
-
-    # Safety check
-    if width != 413 or height != 108:
-
-        raise ValueError(
-            f"template.png must be 413x108. "
-            f"Current size: {width}x{height}"
-        )
-
 
     # =====================================================
-    # ORIGINAL BACKGROUND COLOR
+    # IMPORTANT
     #
-    # This is the dominant blue from your PNG.
+    # At this point:
+    #
+    # image = EXACTLY 413 x 108
+    #
+    # We don't create a new background.
+    # We use your original PNG.
     # =====================================================
 
-    background_blue = (
+
+    # =====================================================
+    # PRICE AREA
+    #
+    # Cover ONLY the old price.
+    # =====================================================
+
+    # Background color sampled/approximated
+    # from your blue template.
+
+    blue = (
         102,
         117,
-        246
+        238
     )
-
-
-    # =====================================================
-    # REMOVE OLD PRICE
-    #
-    # Only the old "$2,419" area is covered.
-    # The rest of your original PNG stays untouched.
-    # =====================================================
 
     draw.rectangle(
         (
-            115,
+            112,
             13,
-            300,
-            59
+            301,
+            58
         ),
-        fill=background_blue
+        fill=blue
     )
 
 
     # =====================================================
-    # NEW LIVE PRICE
+    # LIVE ETH PRICE
     # =====================================================
 
     price_font = get_font(
         42,
         bold=True
     )
+
+    # Reference style:
+    # $2,419
+    #
+    # No decimal inside image.
 
     price_text = (
         f"${price:,.0f}"
@@ -320,11 +395,14 @@ def create_price_image(price):
         bbox[3] - bbox[1]
     )
 
+    # Center horizontally
     price_x = (
-        width - text_width
+        IMAGE_WIDTH
+        - text_width
     ) // 2
 
-    price_y = 10
+    # Vertical position
+    price_y = 8
 
     draw.text(
         (
@@ -338,17 +416,19 @@ def create_price_image(price):
 
 
     # =====================================================
-    # REMOVE OLD USERNAME
+    # USERNAME AREA
     # =====================================================
+
+    # Cover old @eth_price area
 
     draw.rounded_rectangle(
         (
-            160,
-            61,
-            254,
-            78
+            158,
+            60,
+            255,
+            79
         ),
-        radius=8,
+        radius=9,
         fill=(
             204,
             205,
@@ -376,20 +456,40 @@ def create_price_image(price):
         bbox[2] - bbox[0]
     )
 
-    pill_width = (
-        username_width + 18
+    username_height = (
+        bbox[3] - bbox[1]
     )
 
-    pill_height = 16
+    # Pill size
+    padding_left = 12
+    padding_right = 8
+    padding_top = 2
+    padding_bottom = 3
 
+    pill_width = (
+        username_width
+        + padding_left
+        + padding_right
+    )
+
+    pill_height = (
+        username_height
+        + padding_top
+        + padding_bottom
+    )
+
+    # Center pill
     pill_x = (
-        width - pill_width
+        IMAGE_WIDTH
+        - pill_width
     ) // 2
 
     pill_y = 61
 
 
-    # Username pill
+    # =====================================================
+    # USERNAME PILL
+    # =====================================================
 
     draw.rounded_rectangle(
         (
@@ -407,14 +507,17 @@ def create_price_image(price):
     )
 
 
-    # Small icon/dot
+    # =====================================================
+    # SMALL ICON
+    # =====================================================
 
     icon_x = (
         pill_x + 6
     )
 
     icon_y = (
-        pill_y + 8
+        pill_y
+        + pill_height // 2
     )
 
     draw.ellipse(
@@ -432,12 +535,14 @@ def create_price_image(price):
     )
 
 
-    # Username
+    # =====================================================
+    # USERNAME TEXT
+    # =====================================================
 
     draw.text(
         (
-            pill_x + 11,
-            pill_y + 1
+            pill_x + padding_left,
+            pill_y + padding_top
         ),
         USERNAME,
         font=username_font,
@@ -450,19 +555,34 @@ def create_price_image(price):
 
 
     # =====================================================
-    # SAVE EXACT 413x108 PNG
+    # SAVE FINAL PNG
     # =====================================================
 
     image.save(
         OUTPUT_FILE,
-        format="PNG"
+        format="PNG",
+        optimize=True
     )
+
+
+    # Verify final size
+
+    final_image = Image.open(
+        OUTPUT_FILE
+    )
+
+    print(
+        "Final PNG size:",
+        final_image.size
+    )
+
+    final_image.close()
 
     return OUTPUT_FILE
 
 
 # =========================================================
-# CAPTION
+# TELEGRAM CAPTION
 # =========================================================
 
 def create_caption(
@@ -482,16 +602,17 @@ def create_caption(
 
         emoji = "🔻"
 
+
     return (
         f'{emoji} ${price:,.2f} '
-        f'<a href="https://t.me/eth_pricealert">'
+        f'<a href="https://t.me/tmmusa73">'
         f'{USERNAME}'
         f'</a>'
     )
 
 
 # =========================================================
-# SEND ALERT
+# SEND ALERT TO CHANNEL
 # =========================================================
 
 def send_alert(
@@ -499,16 +620,25 @@ def send_alert(
     previous_price=None
 ):
 
-    image_path = create_price_image(
-        price
-    )
-
-    caption = create_caption(
-        price,
-        previous_price
-    )
-
     try:
+
+        # Create image
+        image_path = (
+            create_price_image(
+                price
+            )
+        )
+
+        # Create caption
+        caption = (
+            create_caption(
+                price,
+                previous_price
+            )
+        )
+
+
+        # Send photo
 
         with open(
             image_path,
@@ -517,31 +647,53 @@ def send_alert(
 
             result = telegram_request(
                 "sendPhoto",
+
                 data={
                     "chat_id": CHANNEL_ID,
                     "caption": caption,
                     "parse_mode": "HTML"
                 },
+
                 files={
                     "photo": photo
                 }
             )
 
+
+        # Check result
+
         if result and result.get("ok"):
 
             print(
-                "Alert sent:",
-                f"${price:,.2f}"
+                "================================"
+            )
+
+            print(
+                "ALERT SENT SUCCESSFULLY"
+            )
+
+            print(
+                f"ETH Price: ${price:,.2f}"
+            )
+
+            print(
+                "================================"
             )
 
             return True
 
+
+        print(
+            "Failed to send alert."
+        )
+
         return False
+
 
     except Exception as e:
 
         print(
-            "Send error:",
+            "Alert sending error:",
             e
         )
 
@@ -558,60 +710,80 @@ def price_monitor():
         load_state()
     )
 
+
+    print("")
     print(
-        "=============================="
+        "================================"
+    )
+    print(
+        "       ETH PRICE CHANNEL BOT"
+    )
+    print(
+        "================================"
     )
 
     print(
-        "ETH PRICE CHANNEL BOT"
+        "Price Source : Binance"
     )
 
     print(
-        "=============================="
-    )
-
-    print(
-        "Price Source: Binance"
-    )
-
-    print(
-        "Symbol:",
+        "Symbol       :",
         BINANCE_SYMBOL
     )
 
     print(
-        "Channel:",
+        "Channel      :",
         CHANNEL_ID
     )
 
     print(
-        "Trigger: $",
+        "Trigger      : $",
         PRICE_TRIGGER
     )
 
     print(
-        "Image: 413x108 PNG"
+        "Interval     :",
+        CHECK_INTERVAL,
+        "seconds"
     )
 
     print(
-        "Username:",
+        "Image Size   :",
+        f"{IMAGE_WIDTH}x{IMAGE_HEIGHT}"
+    )
+
+    print(
+        "Username     :",
         USERNAME
     )
 
     print(
-        "=============================="
+        "================================"
     )
 
+    print("")
+
+
+    # =====================================================
+    # INFINITE MONITOR LOOP
+    # =====================================================
 
     while True:
 
         try:
 
+            # Get Binance price
+
             current_price = (
                 get_eth_price()
             )
 
+
             if current_price is None:
+
+                print(
+                    "Could not get ETH price."
+                )
 
                 time.sleep(
                     CHECK_INTERVAL
@@ -621,22 +793,32 @@ def price_monitor():
 
 
             print(
-                f"ETH: "
+                f"Current ETH Price: "
                 f"${current_price:,.2f}"
             )
 
 
-            # First alert
+            # =================================================
+            # FIRST RUN
+            # =================================================
 
             if last_alert_price is None:
+
+                print(
+                    "No previous alert price found."
+                )
 
                 print(
                     "Sending first alert..."
                 )
 
-                if send_alert(
+
+                success = send_alert(
                     current_price
-                ):
+                )
+
+
+                if success:
 
                     last_alert_price = (
                         current_price
@@ -646,8 +828,14 @@ def price_monitor():
                         current_price
                     )
 
+                    print(
+                        "Initial price saved."
+                    )
 
-            # Normal alert
+
+            # =================================================
+            # NORMAL RUN
+            # =================================================
 
             else:
 
@@ -656,23 +844,51 @@ def price_monitor():
                     - last_alert_price
                 )
 
+
                 print(
-                    f"Movement: "
+                    f"Movement from last alert: "
                     f"${movement:,.2f}"
                 )
 
 
+                # =================================================
+                # $30 MOVEMENT DETECTED
+                # =================================================
+
                 if movement >= PRICE_TRIGGER:
 
                     print(
-                        "30 dollar movement detected."
+                        "================================"
                     )
 
-                    if send_alert(
+                    print(
+                        "$30 PRICE MOVEMENT DETECTED!"
+                    )
+
+                    print(
+                        f"Previous: "
+                        f"${last_alert_price:,.2f}"
+                    )
+
+                    print(
+                        f"Current: "
+                        f"${current_price:,.2f}"
+                    )
+
+                    print(
+                        "Sending alert..."
+                    )
+
+
+                    success = send_alert(
                         current_price,
                         last_alert_price
-                    ):
+                    )
 
+
+                    if success:
+
+                        # New reference price
                         last_alert_price = (
                             current_price
                         )
@@ -681,6 +897,16 @@ def price_monitor():
                             current_price
                         )
 
+                        print(
+                            "New alert price saved."
+                        )
+
+                    print(
+                        "================================"
+                    )
+
+
+            # Wait
 
             time.sleep(
                 CHECK_INTERVAL
@@ -705,9 +931,14 @@ def price_monitor():
 
 def main():
 
+    print("")
     print(
         "Starting ETH Price Bot..."
     )
+    print("")
+
+
+    # Test Telegram
 
     if not test_telegram():
 
@@ -717,8 +948,15 @@ def main():
 
         return
 
+
+    # Start monitor
+
     price_monitor()
 
+
+# =========================================================
+# START BOT
+# =========================================================
 
 if __name__ == "__main__":
 
