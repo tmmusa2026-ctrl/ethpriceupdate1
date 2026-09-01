@@ -681,7 +681,7 @@ def create_price_card(price_data):
     ax.text(
         208,
         39,
-        "✈  @eth_pricealert",
+        "✈  @eth_price",
         ha="center",
         va="center",
         fontsize=7.8,
