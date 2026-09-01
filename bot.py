@@ -1,494 +1,148 @@
 import os
+import json
 import time
 import io
+
 import requests
 import matplotlib.pyplot as plt
-from matplotlib.patches import FancyBboxPatch, Polygon
+from matplotlib.patches import Circle, Polygon, FancyBboxPatch
 
 
-# =========================================================
+# ============================================================
 # CONFIG
-# =========================================================
+# ============================================================
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID")
 
-CHECK_INTERVAL = 600  # 10 minutes
-
-
 if not BOT_TOKEN:
-    raise ValueError("TELEGRAM_BOT_TOKEN is missing!")
+    raise RuntimeError(
+        "TELEGRAM_BOT_TOKEN environment variable is not set."
+    )
 
 if not CHANNEL_ID:
-    raise ValueError("TELEGRAM_CHANNEL_ID is missing!")
+    raise RuntimeError(
+        "TELEGRAM_CHANNEL_ID environment variable is not set."
+    )
+
+TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 
-# =========================================================
-# BINANCE ETH PRICE
-# =========================================================
+# ============================================================
+# PRICE UPDATE INTERVAL
+# ============================================================
 
-def get_eth_price():
+# 10 minutes = 600 seconds
+CHECK_INTERVAL = 600
 
-    url = "https://api.binance.com/api/v3/ticker/24hr"
 
-    params = {
-        "symbol": "ETHUSDT"
-    }
+# ============================================================
+# STATE FILE
+# ============================================================
+
+STATE_FILE = "bot_state.json"
+
+
+# ============================================================
+# LOAD / SAVE JSON
+# ============================================================
+
+def load_json(filename, default):
 
     try:
 
-        response = requests.get(
-            url,
-            params=params,
-            timeout=15
-        )
+        if not os.path.exists(filename):
+            return default
 
-        response.raise_for_status()
+        with open(
+            filename,
+            "r",
+            encoding="utf-8"
+        ) as f:
 
-        data = response.json()
-
-        price = float(data["lastPrice"])
-        change_24h = float(data["priceChangePercent"])
-
-        return {
-            "usd": price,
-            "usd_24h_change": change_24h
-        }
+            return json.load(f)
 
     except Exception as e:
 
-        print("Binance API Error:", e)
-
-        return None
-
-
-# =========================================================
-# CREATE PRICE CARD
-# =========================================================
-
-def create_price_card(price_data, previous_price=None):
-
-    price = price_data["usd"]
-    change_24h = price_data["usd_24h_change"]
-
-    # -----------------------------------------------------
-    # Direction
-    # -----------------------------------------------------
-
-    if previous_price is None:
-
-        direction = "up"
-
-    elif price > previous_price:
-
-        direction = "up"
-
-    elif price < previous_price:
-
-        direction = "down"
-
-    else:
-
-        direction = "same"
-
-
-    # -----------------------------------------------------
-    # Figure
-    # -----------------------------------------------------
-
-    fig = plt.figure(
-        figsize=(4.13, 1.08),
-        dpi=100
-    )
-
-    ax = fig.add_axes([0, 0, 1, 1])
-
-    ax.set_xlim(0, 413)
-    ax.set_ylim(0, 108)
-
-    ax.axis("off")
-
-
-    # =====================================================
-    # BACKGROUND
-    # =====================================================
-
-    ax.set_facecolor("#10162D")
-
-    fig.patch.set_facecolor("#10162D")
-
-
-    # =====================================================
-    # BACKGROUND GRADIENT STYLE BLOCKS
-    # =====================================================
-
-    ax.add_patch(
-        FancyBboxPatch(
-            (0, 0),
-            413,
-            108,
-            boxstyle="round,pad=0,rounding_size=0",
-            facecolor="#111A3A",
-            edgecolor="none"
-        )
-    )
-
-
-    # Purple decorative area
-
-    ax.add_patch(
-        FancyBboxPatch(
-            (300, -20),
-            150,
-            150,
-            boxstyle="round,pad=0,rounding_size=80",
-            facecolor="#25195C",
-            edgecolor="none",
-            alpha=0.65
-        )
-    )
-
-
-    # Blue decorative area
-
-    ax.add_patch(
-        FancyBboxPatch(
-            (-50, 65),
-            150,
-            100,
-            boxstyle="round,pad=0,rounding_size=60",
-            facecolor="#142E69",
-            edgecolor="none",
-            alpha=0.55
-        )
-    )
-
-
-    # =====================================================
-    # ETH LOGO
-    # =====================================================
-
-    eth_x = 25
-
-    top_triangle = Polygon(
-        [
-            (eth_x, 83),
-            (eth_x - 8, 57),
-            (eth_x + 8, 57)
-        ],
-        closed=True,
-        facecolor="#627EEA",
-        edgecolor="none"
-    )
-
-    bottom_triangle = Polygon(
-        [
-            (eth_x, 53),
-            (eth_x - 8, 57),
-            (eth_x + 8, 57)
-        ],
-        closed=True,
-        facecolor="#4054B2",
-        edgecolor="none"
-    )
-
-    ax.add_patch(top_triangle)
-    ax.add_patch(bottom_triangle)
-
-
-    # =====================================================
-    # ETHEREUM TEXT
-    # =====================================================
-
-    ax.text(
-        42,
-        82,
-        "ETHEREUM",
-        fontsize=7,
-        fontweight="bold",
-        color="white",
-        va="center"
-    )
-
-    ax.text(
-        42,
-        69,
-        "ETH / USDT",
-        fontsize=5.5,
-        color="#9DA8C7",
-        va="center"
-    )
-
-
-    # =====================================================
-    # PRICE
-    # =====================================================
-
-    if direction == "up":
-
-        price_color = "#20D878"
-
-    elif direction == "down":
-
-        price_color = "#FF4F67"
-
-    else:
-
-        price_color = "white"
-
-
-    price_text = f"${price:,.2f}"
-
-
-    ax.text(
-        206,
-        62,
-        price_text,
-        fontsize=21,
-        fontweight="bold",
-        color=price_color,
-        ha="center",
-        va="center"
-    )
-
-
-    # =====================================================
-    # UP / DOWN TRIANGLE
-    # =====================================================
-
-    if direction == "up":
-
-        triangle = Polygon(
-            [
-                (315, 68),
-                (306, 53),
-                (324, 53)
-            ],
-            closed=True,
-            facecolor="#20D878",
-            edgecolor="none"
+        print(
+            f"❌ {filename} load error: {e}"
         )
 
-        ax.add_patch(triangle)
-
-        ax.text(
-            315,
-            45,
-            "UP",
-            fontsize=5,
-            fontweight="bold",
-            color="#20D878",
-            ha="center"
-        )
+        return default
 
 
-    elif direction == "down":
-
-        triangle = Polygon(
-            [
-                (315, 53),
-                (306, 68),
-                (324, 68)
-            ],
-            closed=True,
-            facecolor="#FF4F67",
-            edgecolor="none"
-        )
-
-        ax.add_patch(triangle)
-
-        ax.text(
-            315,
-            45,
-            "DOWN",
-            fontsize=5,
-            fontweight="bold",
-            color="#FF4F67",
-            ha="center"
-        )
-
-
-    else:
-
-        ax.text(
-            315,
-            59,
-            "•",
-            fontsize=16,
-            fontweight="bold",
-            color="#B5BCD2",
-            ha="center"
-        )
-
-
-    # =====================================================
-    # 24H CHANGE
-    # =====================================================
-
-    if change_24h >= 0:
-
-        change_color = "#20D878"
-        change_sign = "+"
-
-    else:
-
-        change_color = "#FF4F67"
-        change_sign = ""
-
-
-    change_text = f"{change_sign}{change_24h:.2f}% 24H"
-
-
-    ax.text(
-        355,
-        63,
-        change_text,
-        fontsize=7,
-        fontweight="bold",
-        color=change_color,
-        ha="center",
-        va="center"
-    )
-
-
-    # =====================================================
-    # CHANNEL PILL
-    # =====================================================
-
-    pill = FancyBboxPatch(
-        (18, 9),
-        125,
-        19,
-        boxstyle="round,pad=0.4,rounding_size=9",
-        facecolor="#1D2850",
-        edgecolor="#344276",
-        linewidth=0.6
-    )
-
-    ax.add_patch(pill)
-
-
-    ax.text(
-        80.5,
-        18.5,
-        "@eth_pricealert",
-        fontsize=6.5,
-        fontweight="bold",
-        color="white",
-        ha="center",
-        va="center"
-    )
-
-
-    # =====================================================
-    # BINANCE LABEL
-    # =====================================================
-
-    ax.text(
-        350,
-        18,
-        "BINANCE",
-        fontsize=5.5,
-        fontweight="bold",
-        color="#9DA8C7",
-        ha="center",
-        va="center"
-    )
-
-
-    # =====================================================
-    # SMALL MOVEMENT INDICATORS
-    # =====================================================
-
-    if direction == "up":
-
-        for i in range(5):
-
-            x = 155 + (i * 7)
-
-            h = 4 + (i * 2)
-
-            ax.add_patch(
-                FancyBboxPatch(
-                    (x, 9),
-                    4,
-                    h,
-                    boxstyle="round,pad=0.1,rounding_size=1",
-                    facecolor="#20D878",
-                    edgecolor="none",
-                    alpha=0.85
-                )
-            )
-
-
-    elif direction == "down":
-
-        for i in range(5):
-
-            x = 155 + (i * 7)
-
-            h = 12 - (i * 1.5)
-
-            ax.add_patch(
-                FancyBboxPatch(
-                    (x, 9),
-                    4,
-                    h,
-                    boxstyle="round,pad=0.1,rounding_size=1",
-                    facecolor="#FF4F67",
-                    edgecolor="none",
-                    alpha=0.85
-                )
-            )
-
-
-    # =====================================================
-    # SAVE IMAGE TO MEMORY
-    # =====================================================
-
-    image_buffer = io.BytesIO()
-
-    plt.savefig(
-        image_buffer,
-        format="png",
-        dpi=100,
-        bbox_inches=None,
-        pad_inches=0
-    )
-
-    plt.close(fig)
-
-    image_buffer.seek(0)
-
-    return image_buffer
-
-
-# =========================================================
-# TELEGRAM SEND PHOTO
-# =========================================================
-
-def send_photo(image_buffer, caption):
-
-    url = (
-        f"https://api.telegram.org/bot"
-        f"{BOT_TOKEN}/sendPhoto"
-    )
-
-    files = {
-        "photo": (
-            "eth_price.png",
-            image_buffer,
-            "image/png"
-        )
-    }
-
-    data = {
-        "chat_id": CHANNEL_ID,
-        "caption": caption,
-        "parse_mode": "HTML"
-    }
+def save_json(filename, data):
 
     try:
+
+        temp_file = filename + ".tmp"
+
+        with open(
+            temp_file,
+            "w",
+            encoding="utf-8"
+        ) as f:
+
+            json.dump(
+                data,
+                f,
+                indent=2,
+                ensure_ascii=False
+            )
+
+        os.replace(
+            temp_file,
+            filename
+        )
+
+    except Exception as e:
+
+        print(
+            f"❌ {filename} save error: {e}"
+        )
+
+
+# ============================================================
+# BOT STATE
+# ============================================================
+
+state = load_json(
+    STATE_FILE,
+    {
+        "last_sent_price": None
+    }
+)
+
+
+# ============================================================
+# TELEGRAM SEND PHOTO
+# ============================================================
+
+def send_photo(
+    chat_id,
+    image_buffer,
+    caption
+):
+
+    url = f"{TELEGRAM_API}/sendPhoto"
+
+    try:
+
+        image_buffer.seek(0)
+
+        files = {
+            "photo": (
+                "eth_price.png",
+                image_buffer,
+                "image/png"
+            )
+        }
+
+        data = {
+            "chat_id": chat_id,
+            "caption": caption,
+            "parse_mode": "HTML"
+        }
 
         response = requests.post(
             url,
@@ -497,181 +151,858 @@ def send_photo(image_buffer, caption):
             timeout=30
         )
 
-        print("Telegram:", response.text)
+        if not response.ok:
 
-        return response.ok
+            print(
+                f"❌ Telegram photo error "
+                f"{response.status_code}: "
+                f"{response.text}"
+            )
+
+            return False
+
+        return True
 
     except Exception as e:
 
-        print("Telegram Error:", e)
+        print(
+            f"❌ send_photo error: {e}"
+        )
 
         return False
 
 
-# =========================================================
-# CAPTION
-# =========================================================
-
-def format_caption(price_data, previous_price=None):
-
-    price = price_data["usd"]
-
-    change_24h = price_data["usd_24h_change"]
-
-
-    if previous_price is None:
-
-        direction_text = "▲"
-
-    elif price > previous_price:
-
-        direction_text = "▲"
-
-    elif price < previous_price:
-
-        direction_text = "▼"
-
-    else:
-
-        direction_text = "•"
-
-
-    if change_24h >= 0:
-
-        change_text = f"+{change_24h:.2f}%"
-
-    else:
-
-        change_text = f"{change_24h:.2f}%"
-
-
-    caption = (
-        f"<b>{direction_text} ETHEREUM</b>\n\n"
-        f"<b>${price:,.2f}</b>  "
-        f"<b>{change_text}</b> 24H\n\n"
-        f"@eth_pricealert"
-    )
-
-
-    return caption
-
-
-# =========================================================
-# TEST TELEGRAM
-# =========================================================
+# ============================================================
+# TELEGRAM TEST
+# ============================================================
 
 def test_telegram():
 
-    try:
+    url = f"{TELEGRAM_API}/getMe"
 
-        url = (
-            f"https://api.telegram.org/bot"
-            f"{BOT_TOKEN}/getMe"
-        )
+    try:
 
         response = requests.get(
             url,
             timeout=15
         )
 
-        print("Bot Test:", response.text)
+        response.raise_for_status()
+
+        data = response.json()
+
+        if not data.get("ok"):
+
+            print(
+                "❌ Telegram bot verification failed."
+            )
+
+            return False
+
+        bot_username = (
+            data.get("result", {})
+            .get("username", "Unknown")
+        )
+
+        print(
+            f"🤖 Telegram bot connected: "
+            f"@{bot_username}"
+        )
+
+        print(
+            f"📢 Channel: {CHANNEL_ID}"
+        )
+
+        return True
 
     except Exception as e:
 
-        print("Bot test error:", e)
+        print(
+            f"❌ Telegram connection error: {e}"
+        )
+
+        return False
 
 
-# =========================================================
-# SEND CHANNEL UPDATE
-# =========================================================
+# ============================================================
+# GET ETH PRICE FROM BINANCE
+# ============================================================
 
-def send_channel_update(price_data, previous_price=None):
+def get_eth_price():
 
-    image = create_price_card(
-        price_data,
-        previous_price
+    url = (
+        "https://api.binance.com/"
+        "api/v3/ticker/price"
     )
+
+    params = {
+        "symbol": "ETHUSDT"
+    }
+
+    response = requests.get(
+        url,
+        params=params,
+        timeout=15
+    )
+
+    response.raise_for_status()
+
+    data = response.json()
+
+    if "price" not in data:
+
+        raise ValueError(
+            "Binance ETH price missing."
+        )
+
+    price = float(
+        data["price"]
+    )
+
+    return {
+        "usd": price,
+        "usd_24h_change": 0
+    }
+
+
+# ============================================================
+# DRAW ETH ICON
+# ============================================================
+
+def draw_eth_icon(
+    ax,
+    x,
+    y,
+    size,
+    alpha=0.65
+):
+
+    top = (
+        x,
+        y + size
+    )
+
+    left = (
+        x - size * 0.55,
+        y
+    )
+
+    right = (
+        x + size * 0.55,
+        y
+    )
+
+    center = (
+        x,
+        y - size * 0.12
+    )
+
+    bottom = (
+        x,
+        y - size
+    )
+
+
+    ax.add_patch(
+        Polygon(
+            [
+                top,
+                left,
+                center
+            ],
+            closed=True,
+            facecolor="white",
+            edgecolor="white",
+            alpha=alpha
+        )
+    )
+
+
+    ax.add_patch(
+        Polygon(
+            [
+                top,
+                center,
+                right
+            ],
+            closed=True,
+            facecolor="#d9ddff",
+            edgecolor="white",
+            alpha=alpha
+        )
+    )
+
+
+    ax.add_patch(
+        Polygon(
+            [
+                left,
+                bottom,
+                center
+            ],
+            closed=True,
+            facecolor="#b9c2ff",
+            edgecolor="white",
+            alpha=alpha
+        )
+    )
+
+
+    ax.add_patch(
+        Polygon(
+            [
+                center,
+                bottom,
+                right
+            ],
+            closed=True,
+            facecolor="#929eff",
+            edgecolor="white",
+            alpha=alpha
+        )
+    )
+
+
+# ============================================================
+# CREATE 413 x 108 PRICE CARD
+# ============================================================
+
+def create_price_card(price_data):
+
+    price = price_data["usd"]
+
+    WIDTH = 413
+    HEIGHT = 108
+    DPI = 100
+
+
+    fig = plt.figure(
+        figsize=(
+            WIDTH / DPI,
+            HEIGHT / DPI
+        ),
+        dpi=DPI
+    )
+
+
+    ax = fig.add_axes(
+        [
+            0,
+            0,
+            1,
+            1
+        ]
+    )
+
+
+    ax.set_xlim(
+        0,
+        WIDTH
+    )
+
+    ax.set_ylim(
+        0,
+        HEIGHT
+    )
+
+    ax.axis("off")
+
+
+    # ========================================================
+    # BLUE / PURPLE BACKGROUND
+    # ========================================================
+
+    ax.set_facecolor(
+        "#6675F5"
+    )
+
+
+    ax.add_patch(
+        FancyBboxPatch(
+            (
+                0,
+                0
+            ),
+            WIDTH,
+            HEIGHT,
+            boxstyle=(
+                "round,pad=0,"
+                "rounding_size=2"
+            ),
+            facecolor="#6675F5",
+            edgecolor="none"
+        )
+    )
+
+
+    # Purple upper area
+
+    ax.add_patch(
+        Polygon(
+            [
+                (0, 108),
+                (413, 108),
+                (413, 82),
+                (310, 99),
+                (180, 84),
+                (65, 100),
+                (0, 90)
+            ],
+            closed=True,
+            facecolor="#725FEA",
+            alpha=0.70,
+            edgecolor="none"
+        )
+    )
+
+
+    # Light blue middle shape
+
+    ax.add_patch(
+        Polygon(
+            [
+                (0, 67),
+                (85, 79),
+                (170, 63),
+                (255, 82),
+                (330, 68),
+                (413, 79),
+                (413, 108),
+                (0, 108)
+            ],
+            closed=True,
+            facecolor="#7082F7",
+            alpha=0.45,
+            edgecolor="none"
+        )
+    )
+
+
+    # ========================================================
+    # LIGHTNING - LEFT
+    # ========================================================
+
+    ax.plot(
+        [
+            0,
+            24,
+            17,
+            43,
+            29,
+            51
+        ],
+        [
+            99,
+            106,
+            97,
+            101,
+            91,
+            94
+        ],
+        color="white",
+        linewidth=2.5,
+        alpha=0.85
+    )
+
+
+    # ========================================================
+    # LIGHTNING - RIGHT
+    # ========================================================
+
+    ax.plot(
+        [
+            361,
+            381,
+            375,
+            413
+        ],
+        [
+            34,
+            53,
+            47,
+            82
+        ],
+        color="#d7b0ff",
+        linewidth=3,
+        alpha=0.90
+    )
+
+
+    ax.plot(
+        [
+            375,
+            394,
+            388,
+            413
+        ],
+        [
+            38,
+            57,
+            52,
+            75
+        ],
+        color="#ffffff",
+        linewidth=1.4,
+        alpha=0.65
+    )
+
+
+    # ========================================================
+    # DECORATIVE COINS
+    # ========================================================
+
+    coins = [
+        (
+            97,
+            80,
+            14
+        ),
+        (
+            313,
+            76,
+            13
+        )
+    ]
+
+
+    for cx, cy, radius in coins:
+
+        ax.add_patch(
+            Circle(
+                (
+                    cx,
+                    cy
+                ),
+                radius,
+                facecolor="#ffffff",
+                edgecolor="#dfe3ff",
+                linewidth=1.5,
+                alpha=0.25
+            )
+        )
+
+
+        draw_eth_icon(
+            ax,
+            cx,
+            cy,
+            7,
+            0.65
+        )
+
+
+    # ========================================================
+    # TOP CENTER
+    # ========================================================
+
+    ax.text(
+        207,
+        101,
+        "ETHEREUM",
+        ha="center",
+        va="center",
+        fontsize=6.3,
+        fontweight="bold",
+        color="white"
+    )
+
+
+    # ========================================================
+    # TOP RIGHT
+    # ========================================================
+
+    ax.text(
+        405,
+        101,
+        "ETH",
+        ha="right",
+        va="center",
+        fontsize=8.5,
+        fontweight="bold",
+        color="white"
+    )
+
+
+    ax.text(
+        405,
+        94,
+        "PRICE BOT",
+        ha="right",
+        va="center",
+        fontsize=3.6,
+        fontweight="bold",
+        color="#eeeeff"
+    )
+
+
+    # ========================================================
+    # MAIN PRICE
+    # ========================================================
+
+    ax.text(
+        207,
+        67,
+        f"${price:,.0f}",
+        ha="center",
+        va="center",
+        fontsize=34,
+        fontweight="bold",
+        color="black"
+    )
+
+
+    # ========================================================
+    # TELEGRAM USERNAME PILL
+    # ========================================================
+
+    pill = FancyBboxPatch(
+        (
+            161,
+            30
+        ),
+        94,
+        18,
+        boxstyle=(
+            "round,pad=0.02,"
+            "rounding_size=8"
+        ),
+        facecolor="#8D72E7",
+        edgecolor="#BBA9FF",
+        linewidth=0.8,
+        alpha=0.98
+    )
+
+
+    ax.add_patch(
+        pill
+    )
+
+
+    ax.text(
+        208,
+        39,
+        "✈  @eth_pricealert",
+        ha="center",
+        va="center",
+        fontsize=7.8,
+        fontweight="bold",
+        color="#151515"
+    )
+
+
+    # ========================================================
+    # POWERED BY
+    # ========================================================
+
+    ax.text(
+        7,
+        8,
+        "POWERED BY",
+        ha="left",
+        va="center",
+        fontsize=3.5,
+        fontweight="bold",
+        color="white"
+    )
+
+
+    ax.text(
+        7,
+        4,
+        "BINANCE",
+        ha="left",
+        va="center",
+        fontsize=3.5,
+        fontweight="bold",
+        color="white"
+    )
+
+
+    # ========================================================
+    # SAVE EXACT SIZE
+    # ========================================================
+
+    image_buffer = io.BytesIO()
+
+
+    fig.savefig(
+        image_buffer,
+        format="png",
+        dpi=DPI,
+        facecolor="#6675F5",
+        edgecolor="none",
+        pad_inches=0
+    )
+
+
+    image_buffer.seek(0)
+
+    plt.close(fig)
+
+    return image_buffer
+
+
+# ============================================================
+# CAPTION
+# ============================================================
+
+def format_caption(
+    price_data,
+    previous_price=None
+):
+
+    price = price_data["usd"]
+
+
+    # ========================================================
+    # PRICE DIRECTION
+    # ========================================================
+
+    if previous_price is None:
+
+        arrow = "📈"
+
+    elif price > previous_price:
+
+        arrow = "📈"
+
+    elif price < previous_price:
+
+        arrow = "📉"
+
+    else:
+
+        arrow = "📈"
+
+
+    # ========================================================
+    # CAPTION
+    # ========================================================
+
+    return (
+        f'{arrow} ${price:,.2f} '
+        f'<a href="https://t.me/eth_pricealert">'
+        f'@eth_pricealert'
+        f'</a>'
+    )
+
+
+# ============================================================
+# SEND UPDATE TO CHANNEL
+# ============================================================
+
+def send_channel_update(
+    price_data,
+    previous_price=None
+):
+
+    print(
+        "🎨 Creating ETH price image..."
+    )
+
+
+    try:
+
+        image = create_price_card(
+            price_data
+        )
+
+    except Exception as e:
+
+        print(
+            f"❌ Image creation error: {e}"
+        )
+
+        return False
+
 
     caption = format_caption(
         price_data,
         previous_price
     )
 
-    return send_photo(
+
+    print(
+        f"📡 Sending update to "
+        f"{CHANNEL_ID}..."
+    )
+
+
+    success = send_photo(
+        CHANNEL_ID,
         image,
         caption
     )
 
 
-# =========================================================
+    if success:
+
+        print(
+            "✅ Channel update sent successfully."
+        )
+
+        return True
+
+
+    print(
+        "❌ Failed to send channel update."
+    )
+
+    return False
+
+
+# ============================================================
 # PRICE MONITOR
-# =========================================================
+# ============================================================
 
 def price_monitor():
 
-    previous_price = None
+    print(
+        "📈 ETH price monitor started."
+    )
 
-    print("ETH Price Monitor Started")
-    print("Channel:", CHANNEL_ID)
-    print("Interval: 10 minutes")
-    print("Source: Binance ETHUSDT")
+    print(
+        "💱 Price source: Binance"
+    )
+
+    print(
+        "💰 Symbol: ETHUSDT"
+    )
+
+    print(
+        f"📢 Channel: {CHANNEL_ID}"
+    )
+
+    print(
+        "⏰ Update interval: 10 minutes"
+    )
 
 
     while True:
 
         try:
 
+            # =================================================
+            # GET CURRENT PRICE
+            # =================================================
+
             price_data = get_eth_price()
 
+            current_price = price_data[
+                "usd"
+            ]
 
-            if price_data:
 
-                current_price = price_data["usd"]
+            print(
+                f"💵 Current ETH price: "
+                f"${current_price:,.2f}"
+            )
+
+
+            # =================================================
+            # GET PREVIOUS PRICE
+            # =================================================
+
+            previous_price = state.get(
+                "last_sent_price"
+            )
+
+
+            # =================================================
+            # SHOW DIRECTION IN LOG
+            # =================================================
+
+            if previous_price is None:
+
+                direction = "📈"
+
+            elif current_price > previous_price:
+
+                direction = "📈"
+
+            elif current_price < previous_price:
+
+                direction = "📉"
+
+            else:
+
+                direction = "📈"
+
+
+            if previous_price is not None:
+
+                print(
+                    f"{direction} Previous: "
+                    f"${previous_price:,.2f}"
+                )
+
+                print(
+                    f"Movement: "
+                    f"${current_price - previous_price:,.2f}"
+                )
+
+
+            # =================================================
+            # SEND UPDATE
+            # =================================================
+
+            success = send_channel_update(
+                price_data,
+                previous_price
+            )
+
+
+            # =================================================
+            # SAVE PRICE ONLY AFTER SUCCESS
+            # =================================================
+
+            if success:
+
+                state[
+                    "last_sent_price"
+                ] = current_price
+
+
+                save_json(
+                    STATE_FILE,
+                    state
+                )
 
 
                 print(
-                    f"ETH: ${current_price:,.2f}"
+                    f"✅ Last sent price saved: "
+                    f"${current_price:,.2f}"
                 )
-
-
-                # -----------------------------------------
-                # SEND UPDATE
-                # -----------------------------------------
-
-                send_channel_update(
-                    price_data,
-                    previous_price
-                )
-
-
-                # -----------------------------------------
-                # SAVE CURRENT PRICE
-                # -----------------------------------------
-
-                previous_price = current_price
 
 
             else:
 
                 print(
-                    "Could not get ETH price."
+                    "⚠️ Update failed. "
+                    "Previous price kept."
                 )
+
+
+        except requests.exceptions.RequestException as e:
+
+            print(
+                f"🌐 Binance API error: {e}"
+            )
 
 
         except Exception as e:
 
             print(
-                "Monitor Error:",
-                e
+                f"❌ Price monitor error: {e}"
             )
 
 
-        # ---------------------------------------------
+        # =====================================================
         # WAIT 10 MINUTES
-        # ---------------------------------------------
+        # =====================================================
 
         print(
-            "Next update in 10 minutes..."
+            "⏳ Next update in 10 minutes..."
         )
 
         time.sleep(
@@ -679,44 +1010,88 @@ def price_monitor():
         )
 
 
-# =========================================================
+# ============================================================
 # MAIN
-# =========================================================
+# ============================================================
+
+def main():
+
+    print(
+        "=============================================="
+    )
+
+    print(
+        "🚀 ETH PRICE CHANNEL BOT"
+    )
+
+    print(
+        "=============================================="
+    )
+
+    print(
+        f"📢 Channel: {CHANNEL_ID}"
+    )
+
+    print(
+        "💱 Price source: Binance"
+    )
+
+    print(
+        "💰 Symbol: ETHUSDT"
+    )
+
+    print(
+        "⏰ Update interval: 10 minutes"
+    )
+
+    print(
+        "🖼️ Image size: 413 x 108 px"
+    )
+
+    print(
+        "📈 UP: 📈"
+    )
+
+    print(
+        "📉 DOWN: 📉"
+    )
+
+    print(
+        "👤 Username: @eth_pricealert"
+    )
+
+    print(
+        "=============================================="
+    )
+
+
+    # ========================================================
+    # TELEGRAM CONNECTION TEST
+    # ========================================================
+
+    if not test_telegram():
+
+        raise RuntimeError(
+            "Telegram connection failed."
+        )
+
+
+    print(
+        "🚀 Starting price monitor..."
+    )
+
+
+    # ========================================================
+    # START MONITOR
+    # ========================================================
+
+    price_monitor()
+
+
+# ============================================================
+# START BOT
+# ============================================================
 
 if __name__ == "__main__":
 
-    print(
-        "================================"
-    )
-
-    print(
-        "ETH PRICE ALERT BOT"
-    )
-
-    print(
-        "================================"
-    )
-
-    print(
-        "Channel:",
-        CHANNEL_ID
-    )
-
-    print(
-        "Interval:",
-        "10 minutes"
-    )
-
-    print(
-        "API:",
-        "Binance"
-    )
-
-    print(
-        "================================"
-    )
-
-
-    test_telegram()
-
-    price_monitor()
+    main()
