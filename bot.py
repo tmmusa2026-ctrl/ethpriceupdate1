@@ -681,420 +681,7 @@ def create_price_card(price_data):
     ax.text(
         208,
         39,
-        "@eth_pricealert",
-        ha="center",
-        va="center",
-        fontsize=7.8,
-        fontweight="bold",
-        color="#151515"
-    )
-
-
-    # ========================================================
-    # POWERED BY
-    # ========================================================
-
-    ax.text(
-        7,
-        8,
-        "POWERED BY",
-        ha="left",
-        va="center",
-        fontsize=3.5,
-        fontweight="bold",
-        color="white"
-    )
-
-
-    ax.text(
-        7,
-        4,
-        "BINANCE",
-        ha="left",
-        va="center",
-        fontsize=3.5,
-        fontweight="bold",
-        color="white"
-    )
-
-
-    # ========================================================
-    # SAVE EXACT SIZE
-    # ========================================================
-
-    image_buffer = io.BytesIO()
-
-
-    fig.savefig(
-        image_buffer,
-        format="png",
-        dpi=DPI,
-        facecolor="#6675F5",
-        edgecolor="none",
-        pad_inches=0
-    )
-
-
-    image_buffer.seek(0)
-
-    plt.close(fig)
-
-    return image_buffer
-
-
-# ============================================================
-# CAPTION
-# ============================================================
-
-def format_caption(
-    price_data,
-    previous_price=None
-):
-
-    price = price_data["usd"]
-
-
-    # ========================================================
-    # PRICE DIRECTION
-    # ========================================================
-
-    if previous_price is None:
-
-        arrow = "📈"
-
-    elif price > previous_price:
-
-        arrow = "📈"
-
-    elif price < previous_price:
-
-        arrow = "📉"
-
-    else:
-
-        arrow = "📈"
-
-
-    # ========================================================
-    # CAPTION
-    # ========================================================
-
-    return (
-        f'{arrow} ${price:,.2f} '
-        f'<a href="https://t.me/tmmusa73">'
-        f'@eth_price'
-        f'</a>'
-    )
-
-
-# ============================================================
-# SEND UPDATE TO CHANNEL
-# ============================================================
-
-def send_channel_update(
-    price_data,
-    previous_price=None
-):
-
-    print(
-        "🎨 Creating ETH price image..."
-    )
-
-
-    try:
-
-        image = create_price_card(
-            price_data
-        )
-
-    except Exception as e:
-
-        print(
-            f"❌ Image creation error: {e}"
-        )
-
-        return False
-
-
-    caption = format_caption(
-        price_data,
-        previous_price
-    )
-
-
-    print(
-        f"📡 Sending update to "
-        f"{CHANNEL_ID}..."
-    )
-
-
-    success = send_photo(
-        CHANNEL_ID,
-        image,
-        caption
-    )
-
-
-    if success:
-
-        print(
-            "✅ Channel update sent successfully."
-        )
-
-        return True
-
-
-    print(
-        "❌ Failed to send channel update."
-    )
-
-    return False
-
-
-# ============================================================
-# PRICE MONITOR
-# ============================================================
-
-def price_monitor():
-
-    print(
-        "📈 ETH price monitor started."
-    )
-
-    print(
-        "💱 Price source: Binance"
-    )
-
-    print(
-        "💰 Symbol: ETHUSDT"
-    )
-
-    print(
-        f"📢 Channel: {CHANNEL_ID}"
-    )
-
-    print(
-        "⏰ Update interval: 10 minutes"
-    )
-
-
-    while True:
-
-        try:
-
-            # =================================================
-            # GET CURRENT PRICE
-            # =================================================
-
-            price_data = get_eth_price()
-
-            current_price = price_data[
-                "usd"
-            ]
-
-
-            print(
-                f"💵 Current ETH price: "
-                f"${current_price:,.2f}"
-            )
-
-
-            # =================================================
-            # GET PREVIOUS PRICE
-            # =================================================
-
-            previous_price = state.get(
-                "last_sent_price"
-            )
-
-
-            # =================================================
-            # SHOW DIRECTION IN LOG
-            # =================================================
-
-            if previous_price is None:
-
-                direction = "📈"
-
-            elif current_price > previous_price:
-
-                direction = "📈"
-
-            elif current_price < previous_price:
-
-                direction = "📉"
-
-            else:
-
-                direction = "📈"
-
-
-            if previous_price is not None:
-
-                print(
-                    f"{direction} Previous: "
-                    f"${previous_price:,.2f}"
-                )
-
-                print(
-                    f"Movement: "
-                    f"${current_price - previous_price:,.2f}"
-                )
-
-
-            # =================================================
-            # SEND UPDATE
-            # =================================================
-
-            success = send_channel_update(
-                price_data,
-                previous_price
-            )
-
-
-            # =================================================
-            # SAVE PRICE ONLY AFTER SUCCESS
-            # =================================================
-
-            if success:
-
-                state[
-                    "last_sent_price"
-                ] = current_price
-
-
-                save_json(
-                    STATE_FILE,
-                    state
-                )
-
-
-                print(
-                    f"✅ Last sent price saved: "
-                    f"${current_price:,.2f}"
-                )
-
-
-            else:
-
-                print(
-                    "⚠️ Update failed. "
-                    "Previous price kept."
-                )
-
-
-        except requests.exceptions.RequestException as e:
-
-            print(
-                f"🌐 Binance API error: {e}"
-            )
-
-
-        except Exception as e:
-
-            print(
-                f"❌ Price monitor error: {e}"
-            )
-
-
-        # =====================================================
-        # WAIT 10 MINUTES
-        # =====================================================
-
-        print(
-            "⏳ Next update in 10 minutes..."
-        )
-
-        time.sleep(
-            CHECK_INTERVAL
-        )
-
-
-# ============================================================
-# MAIN
-# ============================================================
-
-def main():
-
-    print(
-        "=============================================="
-    )
-
-    print(
-        "🚀 ETH PRICE CHANNEL BOT"
-    )
-
-    print(
-        "=============================================="
-    )
-
-    print(
-        f"📢 Channel: {CHANNEL_ID}"
-    )
-
-    print(
-        "💱 Price source: Binance"
-    )
-
-    print(
-        "💰 Symbol: ETHUSDT"
-    )
-
-    print(
-        "⏰ Update interval: 10 minutes"
-    )
-
-    print(
-        "🖼️ Image size: 413 x 108 px"
-    )
-
-    print(
-        "📈 UP: 📈"
-    )
-
-    print(
-        "📉 DOWN: 📉"
-    )
-
-    print(
-        "👤 Username: @eth_pricealert"
-    )
-
-    print(
-        "=============================================="
-    )
-
-
-    # ========================================================
-    # TELEGRAM CONNECTION TEST
-    # ========================================================
-
-    if not test_telegram():
-
-        raise RuntimeError(
-            "Telegram connection failed."
-        )
-
-
-    print(
-        "🚀 Starting price monitor..."
-    )
-
-
-    # ========================================================
-    # START MONITOR
-    # ========================================================
-
-    price_monitor()
-
-
-# ============================================================
-# START BOT
-# ============================================================
-
-if __name__ == "__main__":
-
-    main()import os
+        "@import os
 import json
 import time
 import io
@@ -1777,7 +1364,420 @@ def create_price_card(price_data):
     ax.text(
         208,
         39,
-        "@eth_pricealert",
+        "✈  @eth_price",
+        ha="center",
+        va="center",
+        fontsize=7.8,
+        fontweight="bold",
+        color="#151515"
+    )
+
+
+    # ========================================================
+    # POWERED BY
+    # ========================================================
+
+    ax.text(
+        7,
+        8,
+        "POWERED BY",
+        ha="left",
+        va="center",
+        fontsize=3.5,
+        fontweight="bold",
+        color="white"
+    )
+
+
+    ax.text(
+        7,
+        4,
+        "BINANCE",
+        ha="left",
+        va="center",
+        fontsize=3.5,
+        fontweight="bold",
+        color="white"
+    )
+
+
+    # ========================================================
+    # SAVE EXACT SIZE
+    # ========================================================
+
+    image_buffer = io.BytesIO()
+
+
+    fig.savefig(
+        image_buffer,
+        format="png",
+        dpi=DPI,
+        facecolor="#6675F5",
+        edgecolor="none",
+        pad_inches=0
+    )
+
+
+    image_buffer.seek(0)
+
+    plt.close(fig)
+
+    return image_buffer
+
+
+# ============================================================
+# CAPTION
+# ============================================================
+
+def format_caption(
+    price_data,
+    previous_price=None
+):
+
+    price = price_data["usd"]
+
+
+    # ========================================================
+    # PRICE DIRECTION
+    # ========================================================
+
+    if previous_price is None:
+
+        arrow = "📈"
+
+    elif price > previous_price:
+
+        arrow = "📈"
+
+    elif price < previous_price:
+
+        arrow = "📉"
+
+    else:
+
+        arrow = "📈"
+
+
+    # ========================================================
+    # CAPTION
+    # ========================================================
+
+    return (
+        f'{arrow} ${price:,.2f} '
+        f'<a href="https://t.me/tmmusa73">'
+        f'@eth_price'
+        f'</a>'
+    )
+
+
+# ============================================================
+# SEND UPDATE TO CHANNEL
+# ============================================================
+
+def send_channel_update(
+    price_data,
+    previous_price=None
+):
+
+    print(
+        "🎨 Creating ETH price image..."
+    )
+
+
+    try:
+
+        image = create_price_card(
+            price_data
+        )
+
+    except Exception as e:
+
+        print(
+            f"❌ Image creation error: {e}"
+        )
+
+        return False
+
+
+    caption = format_caption(
+        price_data,
+        previous_price
+    )
+
+
+    print(
+        f"📡 Sending update to "
+        f"{CHANNEL_ID}..."
+    )
+
+
+    success = send_photo(
+        CHANNEL_ID,
+        image,
+        caption
+    )
+
+
+    if success:
+
+        print(
+            "✅ Channel update sent successfully."
+        )
+
+        return True
+
+
+    print(
+        "❌ Failed to send channel update."
+    )
+
+    return False
+
+
+# ============================================================
+# PRICE MONITOR
+# ============================================================
+
+def price_monitor():
+
+    print(
+        "📈 ETH price monitor started."
+    )
+
+    print(
+        "💱 Price source: Binance"
+    )
+
+    print(
+        "💰 Symbol: ETHUSDT"
+    )
+
+    print(
+        f"📢 Channel: {CHANNEL_ID}"
+    )
+
+    print(
+        "⏰ Update interval: 10 minutes"
+    )
+
+
+    while True:
+
+        try:
+
+            # =================================================
+            # GET CURRENT PRICE
+            # =================================================
+
+            price_data = get_eth_price()
+
+            current_price = price_data[
+                "usd"
+            ]
+
+
+            print(
+                f"💵 Current ETH price: "
+                f"${current_price:,.2f}"
+            )
+
+
+            # =================================================
+            # GET PREVIOUS PRICE
+            # =================================================
+
+            previous_price = state.get(
+                "last_sent_price"
+            )
+
+
+            # =================================================
+            # SHOW DIRECTION IN LOG
+            # =================================================
+
+            if previous_price is None:
+
+                direction = "📈"
+
+            elif current_price > previous_price:
+
+                direction = "📈"
+
+            elif current_price < previous_price:
+
+                direction = "📉"
+
+            else:
+
+                direction = "📈"
+
+
+            if previous_price is not None:
+
+                print(
+                    f"{direction} Previous: "
+                    f"${previous_price:,.2f}"
+                )
+
+                print(
+                    f"Movement: "
+                    f"${current_price - previous_price:,.2f}"
+                )
+
+
+            # =================================================
+            # SEND UPDATE
+            # =================================================
+
+            success = send_channel_update(
+                price_data,
+                previous_price
+            )
+
+
+            # =================================================
+            # SAVE PRICE ONLY AFTER SUCCESS
+            # =================================================
+
+            if success:
+
+                state[
+                    "last_sent_price"
+                ] = current_price
+
+
+                save_json(
+                    STATE_FILE,
+                    state
+                )
+
+
+                print(
+                    f"✅ Last sent price saved: "
+                    f"${current_price:,.2f}"
+                )
+
+
+            else:
+
+                print(
+                    "⚠️ Update failed. "
+                    "Previous price kept."
+                )
+
+
+        except requests.exceptions.RequestException as e:
+
+            print(
+                f"🌐 Binance API error: {e}"
+            )
+
+
+        except Exception as e:
+
+            print(
+                f"❌ Price monitor error: {e}"
+            )
+
+
+        # =====================================================
+        # WAIT 10 MINUTES
+        # =====================================================
+
+        print(
+            "⏳ Next update in 10 minutes..."
+        )
+
+        time.sleep(
+            CHECK_INTERVAL
+        )
+
+
+# ============================================================
+# MAIN
+# ============================================================
+
+def main():
+
+    print(
+        "=============================================="
+    )
+
+    print(
+        "🚀 ETH PRICE CHANNEL BOT"
+    )
+
+    print(
+        "=============================================="
+    )
+
+    print(
+        f"📢 Channel: {CHANNEL_ID}"
+    )
+
+    print(
+        "💱 Price source: Binance"
+    )
+
+    print(
+        "💰 Symbol: ETHUSDT"
+    )
+
+    print(
+        "⏰ Update interval: 10 minutes"
+    )
+
+    print(
+        "🖼️ Image size: 413 x 108 px"
+    )
+
+    print(
+        "📈 UP: 📈"
+    )
+
+    print(
+        "📉 DOWN: 📉"
+    )
+
+    print(
+        "👤 Username: @eth_pricealert"
+    )
+
+    print(
+        "=============================================="
+    )
+
+
+    # ========================================================
+    # TELEGRAM CONNECTION TEST
+    # ========================================================
+
+    if not test_telegram():
+
+        raise RuntimeError(
+            "Telegram connection failed."
+        )
+
+
+    print(
+        "🚀 Starting price monitor..."
+    )
+
+
+    # ========================================================
+    # START MONITOR
+    # ========================================================
+
+    price_monitor()
+
+
+# ============================================================
+# START BOT
+# ============================================================
+
+if __name__ == "__main__":
+
+    main() eth_price ",
         ha="center",
         va="center",
         fontsize=7.8,
