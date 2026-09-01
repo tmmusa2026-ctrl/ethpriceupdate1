@@ -21,25 +21,14 @@ CHECK_INTERVAL = 60
 
 STATE_FILE = "bot_state.json"
 
-
-# =========================================================
-# IMAGE SETTINGS
-# EXACT SIZE: 413 x 108 PIXELS
-# =========================================================
-
-IMAGE_WIDTH = 413
-IMAGE_HEIGHT = 108
-
-
-# =========================================================
-# TELEGRAM USERNAME
-# =========================================================
+TEMPLATE_FILE = "template.png"
+OUTPUT_FILE = "eth_price.png"
 
 USERNAME = "@eth_pricealert"
 
 
 # =========================================================
-# ENVIRONMENT CHECK
+# CHECK CONFIG
 # =========================================================
 
 if not BOT_TOKEN:
@@ -47,6 +36,11 @@ if not BOT_TOKEN:
 
 if not CHANNEL_ID:
     raise ValueError("TELEGRAM_CHANNEL_ID is missing!")
+
+if not os.path.exists(TEMPLATE_FILE):
+    raise FileNotFoundError(
+        "template.png is missing!"
+    )
 
 
 # =========================================================
@@ -56,26 +50,25 @@ if not CHANNEL_ID:
 def get_font(size, bold=False):
 
     if bold:
-
-        font_paths = [
+        fonts = [
             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
             "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf"
         ]
-
     else:
-
-        font_paths = [
+        fonts = [
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
             "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf"
         ]
 
-    for path in font_paths:
+    for font_path in fonts:
 
-        if os.path.exists(path):
+        if os.path.exists(font_path):
 
             try:
-                return ImageFont.truetype(path, size)
-
+                return ImageFont.truetype(
+                    font_path,
+                    size
+                )
             except:
                 pass
 
@@ -83,59 +76,7 @@ def get_font(size, bold=False):
 
 
 # =========================================================
-# TELEGRAM API
-# =========================================================
-
-def telegram_request(method, data=None, files=None):
-
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/{method}"
-
-    try:
-
-        response = requests.post(
-            url,
-            data=data,
-            files=files,
-            timeout=30
-        )
-
-        result = response.json()
-
-        if not result.get("ok"):
-
-            print("Telegram Error:", result)
-
-        return result
-
-    except Exception as e:
-
-        print("Telegram connection error:", e)
-
-        return None
-
-
-# =========================================================
-# TEST TELEGRAM
-# =========================================================
-
-def test_telegram():
-
-    result = telegram_request("getMe")
-
-    if result and result.get("ok"):
-
-        print(
-            "Telegram bot connected:",
-            result["result"].get("username")
-        )
-
-        return True
-
-    return False
-
-
-# =========================================================
-# BINANCE ETH PRICE
+# BINANCE PRICE
 # =========================================================
 
 def get_eth_price():
@@ -167,12 +108,82 @@ def get_eth_price():
 
 
 # =========================================================
+# TELEGRAM
+# =========================================================
+
+def telegram_request(
+    method,
+    data=None,
+    files=None
+):
+
+    url = (
+        f"https://api.telegram.org/"
+        f"bot{BOT_TOKEN}/{method}"
+    )
+
+    try:
+
+        response = requests.post(
+            url,
+            data=data,
+            files=files,
+            timeout=30
+        )
+
+        result = response.json()
+
+        if not result.get("ok"):
+
+            print(
+                "Telegram Error:",
+                result
+            )
+
+        return result
+
+    except Exception as e:
+
+        print(
+            "Telegram connection error:",
+            e
+        )
+
+        return None
+
+
+# =========================================================
+# TEST TELEGRAM
+# =========================================================
+
+def test_telegram():
+
+    result = telegram_request(
+        "getMe"
+    )
+
+    if result and result.get("ok"):
+
+        print(
+            "Telegram bot connected:",
+            result["result"]["username"]
+        )
+
+        return True
+
+    return False
+
+
+# =========================================================
 # STATE
 # =========================================================
 
 def load_state():
 
-    if not os.path.exists(STATE_FILE):
+    if not os.path.exists(
+        STATE_FILE
+    ):
+
         return None
 
     try:
@@ -181,9 +192,9 @@ def load_state():
             STATE_FILE,
             "r",
             encoding="utf-8"
-        ) as file:
+        ) as f:
 
-            data = json.load(file)
+            data = json.load(f)
 
             return data.get(
                 "last_alert_price"
@@ -202,13 +213,13 @@ def save_state(price):
             STATE_FILE,
             "w",
             encoding="utf-8"
-        ) as file:
+        ) as f:
 
             json.dump(
                 {
                     "last_alert_price": price
                 },
-                file
+                f
             )
 
     except Exception as e:
@@ -220,255 +231,70 @@ def save_state(price):
 
 
 # =========================================================
-# ETHEREUM COIN ICON
-# =========================================================
-
-def draw_eth_icon(
-    draw,
-    center_x,
-    center_y,
-    radius
-):
-
-    # Circle
-    draw.ellipse(
-        (
-            center_x - radius,
-            center_y - radius,
-            center_x + radius,
-            center_y + radius
-        ),
-        fill=(108, 130, 225),
-        outline=(165, 180, 245),
-        width=1
-    )
-
-    # Ethereum diamond
-
-    top = (
-        center_x,
-        center_y - 8
-    )
-
-    left = (
-        center_x - 5,
-        center_y
-    )
-
-    right = (
-        center_x + 5,
-        center_y
-    )
-
-    middle = (
-        center_x,
-        center_y + 3
-    )
-
-    bottom = (
-        center_x,
-        center_y + 8
-    )
-
-    draw.polygon(
-        [
-            top,
-            left,
-            middle
-        ],
-        fill=(230, 235, 255)
-    )
-
-    draw.polygon(
-        [
-            top,
-            right,
-            middle
-        ],
-        fill=(195, 205, 250)
-    )
-
-    draw.polygon(
-        [
-            left,
-            middle,
-            bottom
-        ],
-        fill=(180, 190, 235)
-    )
-
-    draw.polygon(
-        [
-            middle,
-            right,
-            bottom
-        ],
-        fill=(205, 212, 250)
-    )
-
-
-# =========================================================
-# CREATE PNG
+# CREATE IMAGE
+#
+# ORIGINAL TEMPLATE:
+# 413 x 108 PX
+#
+# The original PNG is NOT recreated.
+# It is opened directly and only the dynamic
+# price + username areas are changed.
 # =========================================================
 
 def create_price_image(price):
 
-    # -----------------------------------------------------
-    # EXACT 413 x 108 PNG
-    # -----------------------------------------------------
+    image = Image.open(
+        TEMPLATE_FILE
+    ).convert("RGB")
 
-    image = Image.new(
-        "RGB",
+    draw = ImageDraw.Draw(
+        image
+    )
+
+    width, height = image.size
+
+    # Safety check
+    if width != 413 or height != 108:
+
+        raise ValueError(
+            f"template.png must be 413x108. "
+            f"Current size: {width}x{height}"
+        )
+
+
+    # =====================================================
+    # ORIGINAL BACKGROUND COLOR
+    #
+    # This is the dominant blue from your PNG.
+    # =====================================================
+
+    background_blue = (
+        102,
+        117,
+        246
+    )
+
+
+    # =====================================================
+    # REMOVE OLD PRICE
+    #
+    # Only the old "$2,419" area is covered.
+    # The rest of your original PNG stays untouched.
+    # =====================================================
+
+    draw.rectangle(
         (
-            IMAGE_WIDTH,
-            IMAGE_HEIGHT
+            115,
+            13,
+            300,
+            59
         ),
-        (103, 117, 238)
+        fill=background_blue
     )
 
-    draw = ImageDraw.Draw(image)
 
     # =====================================================
-    # BACKGROUND
-    # =====================================================
-
-    # Soft top-left decorative lines
-
-    draw.line(
-        [
-            (0, 7),
-            (10, 2),
-            (20, 7),
-            (29, 2)
-        ],
-        fill=(180, 190, 255),
-        width=1
-    )
-
-    draw.line(
-        [
-            (0, 11),
-            (11, 6),
-            (20, 11)
-        ],
-        fill=(160, 175, 250),
-        width=1
-    )
-
-    # Top-right diagonal
-
-    draw.line(
-        [
-            (390, 0),
-            (413, 16)
-        ],
-        fill=(180, 190, 255),
-        width=1
-    )
-
-    # Bottom-right decorative lines
-
-    draw.line(
-        [
-            (359, 108),
-            (413, 63)
-        ],
-        fill=(226, 190, 255),
-        width=2
-    )
-
-    draw.line(
-        [
-            (369, 108),
-            (413, 70)
-        ],
-        fill=(250, 205, 245),
-        width=2
-    )
-
-    # =====================================================
-    # LEFT ETH ICON
-    # =====================================================
-
-    draw_eth_icon(
-        draw,
-        96,
-        29,
-        14
-    )
-
-    # =====================================================
-    # RIGHT ETH ICON
-    # =====================================================
-
-    draw_eth_icon(
-        draw,
-        314,
-        29,
-        14
-    )
-
-    # =====================================================
-    # TOP CENTER "ETHEREUM"
-    # =====================================================
-
-    ethereum_font = get_font(
-        8,
-        bold=True
-    )
-
-    ethereum_text = "ETHEREUM"
-
-    bbox = draw.textbbox(
-        (0, 0),
-        ethereum_text,
-        font=ethereum_font
-    )
-
-    ethereum_width = (
-        bbox[2] - bbox[0]
-    )
-
-    draw.text(
-        (
-            (IMAGE_WIDTH - ethereum_width) / 2,
-            2
-        ),
-        ethereum_text,
-        font=ethereum_font,
-        fill=(255, 255, 255)
-    )
-
-    # =====================================================
-    # RIGHT TOP ETH
-    # =====================================================
-
-    eth_font = get_font(
-        10,
-        bold=True
-    )
-
-    draw.text(
-        (377, 1),
-        "ETH",
-        font=eth_font,
-        fill=(255, 255, 255)
-    )
-
-    price_bot_font = get_font(
-        4,
-        bold=True
-    )
-
-    draw.text(
-        (377, 13),
-        "PRICE BOT",
-        font=price_bot_font,
-        fill=(235, 235, 255)
-    )
-
-    # =====================================================
-    # MAIN PRICE
+    # NEW LIVE PRICE
     # =====================================================
 
     price_font = get_font(
@@ -476,8 +302,9 @@ def create_price_image(price):
         bold=True
     )
 
-    # Reference-style price
-    price_text = f"${price:,.0f}"
+    price_text = (
+        f"${price:,.0f}"
+    )
 
     bbox = draw.textbbox(
         (0, 0),
@@ -485,17 +312,19 @@ def create_price_image(price):
         font=price_font
     )
 
-    price_width = (
+    text_width = (
         bbox[2] - bbox[0]
     )
 
-    # Center horizontally
+    text_height = (
+        bbox[3] - bbox[1]
+    )
+
     price_x = (
-        IMAGE_WIDTH - price_width
+        width - text_width
     ) // 2
 
-    # Same general vertical position
-    price_y = 12
+    price_y = 10
 
     draw.text(
         (
@@ -507,8 +336,29 @@ def create_price_image(price):
         fill=(0, 0, 0)
     )
 
+
     # =====================================================
-    # USERNAME PILL
+    # REMOVE OLD USERNAME
+    # =====================================================
+
+    draw.rounded_rectangle(
+        (
+            160,
+            61,
+            254,
+            78
+        ),
+        radius=8,
+        fill=(
+            204,
+            205,
+            220
+        )
+    )
+
+
+    # =====================================================
+    # NEW USERNAME
     # =====================================================
 
     username_font = get_font(
@@ -526,20 +376,21 @@ def create_price_image(price):
         bbox[2] - bbox[0]
     )
 
-    username_height = (
-        bbox[3] - bbox[1]
+    pill_width = (
+        username_width + 18
     )
 
-    pill_width = username_width + 17
-    pill_height = 15
+    pill_height = 16
 
     pill_x = (
-        IMAGE_WIDTH - pill_width
+        width - pill_width
     ) // 2
 
-    pill_y = 62
+    pill_y = 61
 
-    # Pill background
+
+    # Username pill
+
     draw.rounded_rectangle(
         (
             pill_x,
@@ -547,13 +398,24 @@ def create_price_image(price):
             pill_x + pill_width,
             pill_y + pill_height
         ),
-        radius=7,
-        fill=(204, 205, 220)
+        radius=8,
+        fill=(
+            204,
+            205,
+            220
+        )
     )
 
-    # Small icon
-    icon_x = pill_x + 6
-    icon_y = pill_y + 7
+
+    # Small icon/dot
+
+    icon_x = (
+        pill_x + 6
+    )
+
+    icon_y = (
+        pill_y + 8
+    )
 
     draw.ellipse(
         (
@@ -562,10 +424,16 @@ def create_price_image(price):
             icon_x + 2,
             icon_y + 2
         ),
-        fill=(45, 45, 55)
+        fill=(
+            45,
+            45,
+            55
+        )
     )
 
+
     # Username
+
     draw.text(
         (
             pill_x + 11,
@@ -573,49 +441,28 @@ def create_price_image(price):
         ),
         USERNAME,
         font=username_font,
-        fill=(30, 30, 40)
+        fill=(
+            30,
+            30,
+            40
+        )
     )
 
-    # =====================================================
-    # SMALL BOTTOM WATERMARK
-    # =====================================================
-
-    watermark_font = get_font(
-        4,
-        bold=True
-    )
-
-    draw.text(
-        (7, 96),
-        "POWERED BY",
-        font=watermark_font,
-        fill=(240, 240, 255)
-    )
-
-    draw.text(
-        (7, 101),
-        "BINANCE",
-        font=watermark_font,
-        fill=(240, 240, 255)
-    )
 
     # =====================================================
-    # SAVE AS PNG
+    # SAVE EXACT 413x108 PNG
     # =====================================================
-
-    output_file = "eth_price.png"
 
     image.save(
-        output_file,
-        format="PNG",
-        optimize=True
+        OUTPUT_FILE,
+        format="PNG"
     )
 
-    return output_file
+    return OUTPUT_FILE
 
 
 # =========================================================
-# TELEGRAM CAPTION
+# CAPTION
 # =========================================================
 
 def create_caption(
@@ -637,14 +484,14 @@ def create_caption(
 
     return (
         f'{emoji} ${price:,.2f} '
-        f'<a href="https://t.me/tmmusa73">'
+        f'<a href="https://t.me/eth_pricealert">'
         f'{USERNAME}'
         f'</a>'
     )
 
 
 # =========================================================
-# SEND IMAGE TO CHANNEL
+# SEND ALERT
 # =========================================================
 
 def send_alert(
@@ -652,16 +499,16 @@ def send_alert(
     previous_price=None
 ):
 
+    image_path = create_price_image(
+        price
+    )
+
+    caption = create_caption(
+        price,
+        previous_price
+    )
+
     try:
-
-        image_path = create_price_image(
-            price
-        )
-
-        caption = create_caption(
-            price,
-            previous_price
-        )
 
         with open(
             image_path,
@@ -683,7 +530,7 @@ def send_alert(
         if result and result.get("ok"):
 
             print(
-                "Alert sent successfully:",
+                "Alert sent:",
                 f"${price:,.2f}"
             )
 
@@ -694,7 +541,7 @@ def send_alert(
     except Exception as e:
 
         print(
-            "Alert error:",
+            "Send error:",
             e
         )
 
@@ -707,39 +554,64 @@ def send_alert(
 
 def price_monitor():
 
-    last_alert_price = load_state()
+    last_alert_price = (
+        load_state()
+    )
 
-    print("")
-    print("==============================")
-    print("      ETH PRICE CHANNEL BOT")
-    print("==============================")
-    print("Price Source: Binance")
-    print("Symbol:", BINANCE_SYMBOL)
-    print("Channel:", CHANNEL_ID)
-    print("Trigger: $", PRICE_TRIGGER)
     print(
-        "Check Interval:",
-        CHECK_INTERVAL,
-        "seconds"
+        "=============================="
     )
+
     print(
-        "Image Size:",
-        f"{IMAGE_WIDTH}x{IMAGE_HEIGHT}"
+        "ETH PRICE CHANNEL BOT"
     )
-    print("==============================")
-    print("")
+
+    print(
+        "=============================="
+    )
+
+    print(
+        "Price Source: Binance"
+    )
+
+    print(
+        "Symbol:",
+        BINANCE_SYMBOL
+    )
+
+    print(
+        "Channel:",
+        CHANNEL_ID
+    )
+
+    print(
+        "Trigger: $",
+        PRICE_TRIGGER
+    )
+
+    print(
+        "Image: 413x108 PNG"
+    )
+
+    print(
+        "Username:",
+        USERNAME
+    )
+
+    print(
+        "=============================="
+    )
+
 
     while True:
 
         try:
 
-            current_price = get_eth_price()
+            current_price = (
+                get_eth_price()
+            )
 
             if current_price is None:
-
-                print(
-                    "Unable to get Binance price."
-                )
 
                 time.sleep(
                     CHECK_INTERVAL
@@ -747,30 +619,24 @@ def price_monitor():
 
                 continue
 
+
             print(
-                f"Current ETH price: "
+                f"ETH: "
                 f"${current_price:,.2f}"
             )
 
-            # =================================================
-            # FIRST ALERT
-            # =================================================
+
+            # First alert
 
             if last_alert_price is None:
 
                 print(
-                    "First price detected."
+                    "Sending first alert..."
                 )
 
-                print(
-                    "Sending initial alert..."
-                )
-
-                success = send_alert(
+                if send_alert(
                     current_price
-                )
-
-                if success:
+                ):
 
                     last_alert_price = (
                         current_price
@@ -780,9 +646,8 @@ def price_monitor():
                         current_price
                     )
 
-            # =================================================
-            # $30 MOVEMENT
-            # =================================================
+
+            # Normal alert
 
             else:
 
@@ -792,26 +657,21 @@ def price_monitor():
                 )
 
                 print(
-                    f"Movement from last alert: "
+                    f"Movement: "
                     f"${movement:,.2f}"
                 )
+
 
                 if movement >= PRICE_TRIGGER:
 
                     print(
-                        "ETH moved $30+."
+                        "30 dollar movement detected."
                     )
 
-                    print(
-                        "Sending alert..."
-                    )
-
-                    success = send_alert(
+                    if send_alert(
                         current_price,
                         last_alert_price
-                    )
-
-                    if success:
+                    ):
 
                         last_alert_price = (
                             current_price
@@ -821,9 +681,11 @@ def price_monitor():
                             current_price
                         )
 
+
             time.sleep(
                 CHECK_INTERVAL
             )
+
 
         except Exception as e:
 
@@ -843,10 +705,9 @@ def price_monitor():
 
 def main():
 
-    print("")
-    print("==============================")
-    print("       ETH PRICE BOT")
-    print("==============================")
+    print(
+        "Starting ETH Price Bot..."
+    )
 
     if not test_telegram():
 
@@ -858,10 +719,6 @@ def main():
 
     price_monitor()
 
-
-# =========================================================
-# START
-# =========================================================
 
 if __name__ == "__main__":
 
