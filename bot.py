@@ -29,7 +29,7 @@ if not TELEGRAM_CHANNEL_ID:
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 # ETH price movement required for a new notification
-PRICE_TRIGGER = 30.0
+PRICE_TRIGGER = 10.0
 
 # Check ETH price every 60 seconds
 # This is NOT the notification interval.
@@ -1041,11 +1041,11 @@ def format_caption(price_data):
 
     if change >= 0:
 
-        arrow = "🔺"
+        arrow = "📈"
 
     else:
 
-        arrow = "🔻"
+        arrow = "📉"
 
 
     # This creates the text below the image.
@@ -1053,7 +1053,7 @@ def format_caption(price_data):
 
     return (
         f'{arrow} ${price:,.0f} '
-        f'<a href="https://t.me/tmmad1">'
+        f'<a href="https://t.me/tmmusa73">'
         f'@eth_price'
         f'</a>'
     )
