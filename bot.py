@@ -21,15 +21,25 @@ CHECK_INTERVAL = 60
 
 STATE_FILE = "bot_state.json"
 
-# Your original reference image
-TEMPLATE_FILE = "template.png"
 
-# Output image
-OUTPUT_FILE = "eth_price.png"
+# =========================================================
+# IMAGE SETTINGS
+# EXACT SIZE: 413 x 108 PIXELS
+# =========================================================
+
+IMAGE_WIDTH = 413
+IMAGE_HEIGHT = 108
 
 
 # =========================================================
-# ENVIRONMENT VARIABLES
+# TELEGRAM USERNAME
+# =========================================================
+
+USERNAME = "@eth_pricealert"
+
+
+# =========================================================
+# ENVIRONMENT CHECK
 # =========================================================
 
 if not BOT_TOKEN:
@@ -46,17 +56,20 @@ if not CHANNEL_ID:
 def get_font(size, bold=False):
 
     if bold:
-        paths = [
+
+        font_paths = [
             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
             "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf"
         ]
+
     else:
-        paths = [
+
+        font_paths = [
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
             "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf"
         ]
 
-    for path in paths:
+    for path in font_paths:
 
         if os.path.exists(path):
 
@@ -122,7 +135,7 @@ def test_telegram():
 
 
 # =========================================================
-# BINANCE PRICE
+# BINANCE ETH PRICE
 # =========================================================
 
 def get_eth_price():
@@ -154,13 +167,12 @@ def get_eth_price():
 
 
 # =========================================================
-# LOAD STATE
+# STATE
 # =========================================================
 
 def load_state():
 
     if not os.path.exists(STATE_FILE):
-
         return None
 
     try:
@@ -181,10 +193,6 @@ def load_state():
 
         return None
 
-
-# =========================================================
-# SAVE STATE
-# =========================================================
 
 def save_state(price):
 
@@ -212,61 +220,283 @@ def save_state(price):
 
 
 # =========================================================
-# CREATE IMAGE FROM TEMPLATE
+# ETHEREUM COIN ICON
+# =========================================================
+
+def draw_eth_icon(
+    draw,
+    center_x,
+    center_y,
+    radius
+):
+
+    # Circle
+    draw.ellipse(
+        (
+            center_x - radius,
+            center_y - radius,
+            center_x + radius,
+            center_y + radius
+        ),
+        fill=(108, 130, 225),
+        outline=(165, 180, 245),
+        width=1
+    )
+
+    # Ethereum diamond
+
+    top = (
+        center_x,
+        center_y - 8
+    )
+
+    left = (
+        center_x - 5,
+        center_y
+    )
+
+    right = (
+        center_x + 5,
+        center_y
+    )
+
+    middle = (
+        center_x,
+        center_y + 3
+    )
+
+    bottom = (
+        center_x,
+        center_y + 8
+    )
+
+    draw.polygon(
+        [
+            top,
+            left,
+            middle
+        ],
+        fill=(230, 235, 255)
+    )
+
+    draw.polygon(
+        [
+            top,
+            right,
+            middle
+        ],
+        fill=(195, 205, 250)
+    )
+
+    draw.polygon(
+        [
+            left,
+            middle,
+            bottom
+        ],
+        fill=(180, 190, 235)
+    )
+
+    draw.polygon(
+        [
+            middle,
+            right,
+            bottom
+        ],
+        fill=(205, 212, 250)
+    )
+
+
+# =========================================================
+# CREATE PNG
 # =========================================================
 
 def create_price_image(price):
 
     # -----------------------------------------------------
-    # IMPORTANT:
-    # template.png must be your ORIGINAL design image.
+    # EXACT 413 x 108 PNG
     # -----------------------------------------------------
 
-    if not os.path.exists(TEMPLATE_FILE):
-
-        raise FileNotFoundError(
-            "template.png not found!"
-        )
-
-    image = Image.open(
-        TEMPLATE_FILE
-    ).convert("RGB")
+    image = Image.new(
+        "RGB",
+        (
+            IMAGE_WIDTH,
+            IMAGE_HEIGHT
+        ),
+        (103, 117, 238)
+    )
 
     draw = ImageDraw.Draw(image)
 
-    width, height = image.size
-
     # =====================================================
-    # PRICE
+    # BACKGROUND
     # =====================================================
 
-    price_font = get_font(
-        int(height * 0.40),
+    # Soft top-left decorative lines
+
+    draw.line(
+        [
+            (0, 7),
+            (10, 2),
+            (20, 7),
+            (29, 2)
+        ],
+        fill=(180, 190, 255),
+        width=1
+    )
+
+    draw.line(
+        [
+            (0, 11),
+            (11, 6),
+            (20, 11)
+        ],
+        fill=(160, 175, 250),
+        width=1
+    )
+
+    # Top-right diagonal
+
+    draw.line(
+        [
+            (390, 0),
+            (413, 16)
+        ],
+        fill=(180, 190, 255),
+        width=1
+    )
+
+    # Bottom-right decorative lines
+
+    draw.line(
+        [
+            (359, 108),
+            (413, 63)
+        ],
+        fill=(226, 190, 255),
+        width=2
+    )
+
+    draw.line(
+        [
+            (369, 108),
+            (413, 70)
+        ],
+        fill=(250, 205, 245),
+        width=2
+    )
+
+    # =====================================================
+    # LEFT ETH ICON
+    # =====================================================
+
+    draw_eth_icon(
+        draw,
+        96,
+        29,
+        14
+    )
+
+    # =====================================================
+    # RIGHT ETH ICON
+    # =====================================================
+
+    draw_eth_icon(
+        draw,
+        314,
+        29,
+        14
+    )
+
+    # =====================================================
+    # TOP CENTER "ETHEREUM"
+    # =====================================================
+
+    ethereum_font = get_font(
+        8,
         bold=True
     )
 
+    ethereum_text = "ETHEREUM"
+
+    bbox = draw.textbbox(
+        (0, 0),
+        ethereum_text,
+        font=ethereum_font
+    )
+
+    ethereum_width = (
+        bbox[2] - bbox[0]
+    )
+
+    draw.text(
+        (
+            (IMAGE_WIDTH - ethereum_width) / 2,
+            2
+        ),
+        ethereum_text,
+        font=ethereum_font,
+        fill=(255, 255, 255)
+    )
+
+    # =====================================================
+    # RIGHT TOP ETH
+    # =====================================================
+
+    eth_font = get_font(
+        10,
+        bold=True
+    )
+
+    draw.text(
+        (377, 1),
+        "ETH",
+        font=eth_font,
+        fill=(255, 255, 255)
+    )
+
+    price_bot_font = get_font(
+        4,
+        bold=True
+    )
+
+    draw.text(
+        (377, 13),
+        "PRICE BOT",
+        font=price_bot_font,
+        fill=(235, 235, 255)
+    )
+
+    # =====================================================
+    # MAIN PRICE
+    # =====================================================
+
+    price_font = get_font(
+        42,
+        bold=True
+    )
+
+    # Reference-style price
     price_text = f"${price:,.0f}"
 
-    # Find center of image
     bbox = draw.textbbox(
         (0, 0),
         price_text,
         font=price_font
     )
 
-    text_width = bbox[2] - bbox[0]
-    text_height = bbox[3] - bbox[1]
-
-    price_x = (
-        width - text_width
-    ) // 2
-
-    # Position similar to your reference
-    price_y = int(
-        height * 0.12
+    price_width = (
+        bbox[2] - bbox[0]
     )
 
-    # Black price
+    # Center horizontally
+    price_x = (
+        IMAGE_WIDTH - price_width
+    ) // 2
+
+    # Same general vertical position
+    price_y = 12
+
     draw.text(
         (
             price_x,
@@ -277,21 +507,18 @@ def create_price_image(price):
         fill=(0, 0, 0)
     )
 
-
     # =====================================================
-    # USERNAME
+    # USERNAME PILL
     # =====================================================
-
-    username = "@eth_pricealert"
 
     username_font = get_font(
-        int(height * 0.095),
+        9,
         bold=True
     )
 
     bbox = draw.textbbox(
         (0, 0),
-        username,
+        USERNAME,
         font=username_font
     )
 
@@ -303,60 +530,30 @@ def create_price_image(price):
         bbox[3] - bbox[1]
     )
 
-    # Username centered
-    username_x = (
-        width - username_width
+    pill_width = username_width + 17
+    pill_height = 15
+
+    pill_x = (
+        IMAGE_WIDTH - pill_width
     ) // 2
 
-    username_y = int(
-        height * 0.61
-    )
+    pill_y = 62
 
-    # Pill dimensions
-    padding_x = 9
-    padding_y = 3
-
-    pill_left = (
-        username_x - padding_x
-    )
-
-    pill_top = (
-        username_y - padding_y
-    )
-
-    pill_right = (
-        username_x
-        + username_width
-        + padding_x
-    )
-
-    pill_bottom = (
-        username_y
-        + username_height
-        + padding_y
-    )
-
-    # Pill
+    # Pill background
     draw.rounded_rectangle(
         (
-            pill_left,
-            pill_top,
-            pill_right,
-            pill_bottom
+            pill_x,
+            pill_y,
+            pill_x + pill_width,
+            pill_y + pill_height
         ),
-        radius=8,
-        fill=(205, 205, 220)
+        radius=7,
+        fill=(204, 205, 220)
     )
 
-    # Small Telegram-style dot/icon
-    icon_x = pill_left + 6
-    icon_y = (
-        pill_top
-        + (
-            pill_bottom
-            - pill_top
-        ) // 2
-    )
+    # Small icon
+    icon_x = pill_x + 6
+    icon_y = pill_y + 7
 
     draw.ellipse(
         (
@@ -371,30 +568,54 @@ def create_price_image(price):
     # Username
     draw.text(
         (
-            username_x,
-            username_y
+            pill_x + 11,
+            pill_y + 1
         ),
-        username,
+        USERNAME,
         font=username_font,
         fill=(30, 30, 40)
     )
 
+    # =====================================================
+    # SMALL BOTTOM WATERMARK
+    # =====================================================
+
+    watermark_font = get_font(
+        4,
+        bold=True
+    )
+
+    draw.text(
+        (7, 96),
+        "POWERED BY",
+        font=watermark_font,
+        fill=(240, 240, 255)
+    )
+
+    draw.text(
+        (7, 101),
+        "BINANCE",
+        font=watermark_font,
+        fill=(240, 240, 255)
+    )
 
     # =====================================================
-    # SAVE
+    # SAVE AS PNG
     # =====================================================
+
+    output_file = "eth_price.png"
 
     image.save(
-        OUTPUT_FILE,
+        output_file,
         format="PNG",
         optimize=True
     )
 
-    return OUTPUT_FILE
+    return output_file
 
 
 # =========================================================
-# CAPTION
+# TELEGRAM CAPTION
 # =========================================================
 
 def create_caption(
@@ -417,13 +638,13 @@ def create_caption(
     return (
         f'{emoji} ${price:,.2f} '
         f'<a href="https://t.me/tmmusa73">'
-        f'@eth_pricealert'
+        f'{USERNAME}'
         f'</a>'
     )
 
 
 # =========================================================
-# SEND ALERT
+# SEND IMAGE TO CHANNEL
 # =========================================================
 
 def send_alert(
@@ -501,6 +722,10 @@ def price_monitor():
         CHECK_INTERVAL,
         "seconds"
     )
+    print(
+        "Image Size:",
+        f"{IMAGE_WIDTH}x{IMAGE_HEIGHT}"
+    )
     print("==============================")
     print("")
 
@@ -512,6 +737,10 @@ def price_monitor():
 
             if current_price is None:
 
+                print(
+                    "Unable to get Binance price."
+                )
+
                 time.sleep(
                     CHECK_INTERVAL
                 )
@@ -519,20 +748,29 @@ def price_monitor():
                 continue
 
             print(
-                f"Binance ETH Price: "
+                f"Current ETH price: "
                 f"${current_price:,.2f}"
             )
 
-            # First alert
+            # =================================================
+            # FIRST ALERT
+            # =================================================
+
             if last_alert_price is None:
+
+                print(
+                    "First price detected."
+                )
 
                 print(
                     "Sending initial alert..."
                 )
 
-                if send_alert(
+                success = send_alert(
                     current_price
-                ):
+                )
+
+                if success:
 
                     last_alert_price = (
                         current_price
@@ -542,6 +780,10 @@ def price_monitor():
                         current_price
                     )
 
+            # =================================================
+            # $30 MOVEMENT
+            # =================================================
+
             else:
 
                 movement = abs(
@@ -550,7 +792,7 @@ def price_monitor():
                 )
 
                 print(
-                    f"Movement: "
+                    f"Movement from last alert: "
                     f"${movement:,.2f}"
                 )
 
@@ -560,10 +802,16 @@ def price_monitor():
                         "ETH moved $30+."
                     )
 
-                    if send_alert(
+                    print(
+                        "Sending alert..."
+                    )
+
+                    success = send_alert(
                         current_price,
                         last_alert_price
-                    ):
+                    )
+
+                    if success:
 
                         last_alert_price = (
                             current_price
@@ -595,9 +843,10 @@ def price_monitor():
 
 def main():
 
-    print(
-        "ETH Price Bot Starting..."
-    )
+    print("")
+    print("==============================")
+    print("       ETH PRICE BOT")
+    print("==============================")
 
     if not test_telegram():
 
@@ -609,6 +858,10 @@ def main():
 
     price_monitor()
 
+
+# =========================================================
+# START
+# =========================================================
 
 if __name__ == "__main__":
 
